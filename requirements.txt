@@ -2,6 +2,7 @@ accelerate
 codetiming
 datasets
 dill
+torch
 flash-attn
 hydra-core
 numpy
@@ -14,3 +15,4 @@ vllm<=0.6.3
 wandb
 IPython
 matplotlib
+seaborn
