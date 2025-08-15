@@ -80,12 +80,13 @@ def load_json_with_cleaning(file_path):
 
 def main():
     # Load the IT responses
-    it_file = "refusal_datasets/arditi_harmful_responses_it.json"
+    # it_file = "refusal_datasets/arditi_harmful_responses_it.json"
+    it_file = "refusal_responses/caa_refusal_responses_it.json"
     print(f"Loading IT responses from {it_file}...")
     it_data = load_json_with_cleaning(it_file)
     
     # Load the search responses
-    search_file = "refusal_datasets/arditi_harmful_responses_search.json"
+    search_file = "refusal_responses/caa_refusal_responses_search.json"
     print(f"Loading search responses from {search_file}...")
     search_data = load_json_with_cleaning(search_file)
     
@@ -127,7 +128,7 @@ def main():
             print(f"Processed {len(merged_data)}/{len(all_indices)} questions")
     
     # Save the merged data
-    output_file = "refusal_datasets/arditi_harmful_responses_merged.json"
+    output_file = "refusal_responses/caa_refusal_responses_merged.json"
     print(f"\nSaving merged data to {output_file}...")
     with open(output_file, 'w', encoding='utf-8') as f:
         json.dump(merged_data, f, indent=2, ensure_ascii=False)

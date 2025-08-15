@@ -5,6 +5,7 @@ from datasets import load_dataset
 import requests
 import json
 import time
+import gc
 
 # Model ID and device setup
 model_id = "PeterJinGo/SearchR1-nq_hotpotqa_train-qwen2.5-7b-it-em-ppo"
@@ -78,9 +79,8 @@ def search(query: str):
 target_sequences = ["</search>", " </search>", "</search>\n", " </search>\n", "</search>\n\n", " </search>\n\n"]
 stopping_criteria = transformers.StoppingCriteriaList([StopOnSequence(target_sequences, tokenizer)])
 
-def process_single_question(question_text):
-    """Process a single question using the same logic as infer_search.py"""
-    
+def prepare_prompt(question_text):
+    """Prepare a single prompt for a question"""
     question = question_text.strip()
     if question[-1] != '?':
         question += '?'
@@ -90,13 +90,20 @@ def process_single_question(question_text):
 You must conduct reasoning inside <think> and </think> first every time you get new information. \
 After reasoning, if you find you lack some knowledge, you can call a search engine by <search> query </search> and it will return the top searched results between <information> and </information>. \
 You can search as many times as your want. \
-If you find no further external knowledge needed, you can directly provide the answer inside <answer> and </answer>, without detailed illustrations. For example, <answer> Beijing </answer>. Question: {question}\n"""
+If you find no further external knowledge needed, you can directly provide the answer inside <answer> and </answer>, without detailed illustrations. Question: {question}\n"""
 
     if tokenizer.chat_template:
         prompt = tokenizer.apply_chat_template([{"role": "user", "content": prompt}], add_generation_prompt=True, tokenize=False)
+    
+    return prompt
 
+def process_single_question(question_text):
+    """Process a single question using the same logic as infer_search.py"""
+    
+    prompt = prepare_prompt(question_text)
+    
     print(f'\n\n################# [Start Reasoning + Searching] ##################\n\n')
-    print(f"Question: {question}")
+    print(f"Question: {question_text}")
     
     # Initialize variables exactly like infer_search.py
     cnt = 0
@@ -112,11 +119,12 @@ If you find no further external knowledge needed, you can directly provide the a
         outputs = model.generate(
             input_ids,
             attention_mask=attention_mask,
-            max_new_tokens=1024,
+            max_new_tokens=4096*4,
             stopping_criteria=stopping_criteria,
             pad_token_id=tokenizer.eos_token_id,
             do_sample=True,
-            temperature=0.7
+            temperature=0.7,
+            use_cache=True  # Enable KV caching for faster generation
         )
 
         if outputs[0][-1].item() in curr_eos:
@@ -142,32 +150,23 @@ If you find no further external knowledge needed, you can directly provide the a
         cnt += 1
         print(search_text)
     
+    # Clear GPU memory after processing
+    torch.cuda.empty_cache()
+    gc.collect()
+    
     return full_response
 
-def main():
-    # Load the questions from the JSON file
-    input_file = "refusal_datasets/arditi_harmful_train.json"
-    output_file = "refusal_datasets/arditi_harmful_responses.json"
+def process_batch(questions, questions_data, output_file, batch_size=16):
+    """Process questions in batches with per-batch saving"""
     
-    print(f"Loading questions from {input_file}...")
-    with open(input_file, 'r', encoding='utf-8') as f:
-        questions_data = json.load(f)
-    
-    print(f"Found {len(questions_data)} questions to process")
-    
-    # Process each question
     results = []
-    for i, item in enumerate(questions_data):
-        question = item.get("instruction", "")
-        if not question:
-            continue
-            
-        print(f"\n{'='*80}")
-        print(f"Processing question {i+1}/{len(questions_data)}")
-        print(f"{'='*80}")
+    
+    # Process questions individually (search requires sequential processing)
+    for i, question in enumerate(questions):
+        print(f'\n\n################# [Processing Question {i+1}/{len(questions)}] ##################\n\n')
         
         try:
-            # Process the question using the same logic as infer_search.py
+            # Process the question using the search logic
             response = process_single_question(question)
             
             # Create result entry
@@ -176,21 +175,23 @@ def main():
                 "response": response,
                 "question_index": i,
             }
-            
             results.append(result_entry)
             
-            # Save progress every 10 questions
-            if (i + 1) % 10 == 0:
-                print(f"\nSaving progress... ({i+1}/{len(questions_data)})")
+            print(f"Question {i+1}: {question[:100]}...")
+            print(f"Response: {response[:200]}...")
+            print("-" * 50)
+            
+            # Save progress every batch_size questions
+            if (i + 1) % batch_size == 0 or (i + 1) == len(questions):
+                print(f"\nSaving progress... ({i+1}/{len(questions)} questions)")
                 with open(output_file, 'w', encoding='utf-8') as f:
                     json.dump(results, f, indent=2, ensure_ascii=False)
             
-            # Small delay to prevent overwhelming the system
+            # Small delay to prevent overwhelming the search service
             time.sleep(1)
             
         except Exception as e:
             print(f"Error processing question {i+1}: {e}")
-            # Add error entry
             result_entry = {
                 "question": question,
                 "response": f"ERROR: {str(e)}",
@@ -198,13 +199,79 @@ def main():
             }
             results.append(result_entry)
     
-    # Save final results
-    print(f"\nSaving final results to {output_file}...")
-    with open(output_file, 'w', encoding='utf-8') as f:
-        json.dump(results, f, indent=2, ensure_ascii=False)
+    return [r["response"] for r in results]
+
+def main():
+    # Load the questions from the JSON file
+    input_file = "refusal_datasets/refusal_caa_restructured.json"
+    output_file = "refusal_responses/caa_refusal_responses_search.json"
     
-    print(f"Processing complete! Results saved to {output_file}")
-    print(f"Successfully processed {len(results)} questions")
+    print(f"Loading questions from {input_file}...")
+    with open(input_file, 'r', encoding='utf-8') as f:
+        questions_data = json.load(f)
+    
+    print(f"Found {len(questions_data)} questions to process")
+    
+    # Extract questions
+    questions = [item.get("question", "") for item in questions_data if item.get("question", "")]
+    
+    print(f"Processing {len(questions)} valid questions in batches...")
+    
+    batch_size = 256
+    
+    try:
+        # Process all questions with per-batch saving
+        all_responses = process_batch(questions, questions_data, output_file, batch_size=batch_size)
+        
+        print(f"Processing complete! Results saved to {output_file}")
+        print(f"Successfully processed {len(all_responses)} questions")
+        
+    except Exception as e:
+        print(f"Error during batch processing: {e}")
+        print("Falling back to individual processing...")
+        
+        # Fallback to individual processing
+        results = []
+        for i, item in enumerate(questions_data):
+            question = item.get("question", "")
+            if not question:
+                continue
+                
+            print(f"Processing question {i+1}/{len(questions_data)}")
+            
+            try:
+                # Process single question
+                response = process_single_question(question)
+                
+                result_entry = {
+                    "question": question,
+                    "response": response,
+                    "question_index": i,
+                }
+                results.append(result_entry)
+                
+                # Save progress every 10 questions
+                if (i + 1) % 10 == 0:
+                    print(f"Saving progress... ({i+1}/{len(questions_data)})")
+                    with open(output_file, 'w', encoding='utf-8') as f:
+                        json.dump(results, f, indent=2, ensure_ascii=False)
+                
+            except Exception as individual_error:
+                print(f"Error processing question {i+1}: {individual_error}")
+                result_entry = {
+                    "question": question,
+                    "response": f"ERROR: {str(individual_error)}",
+                    "question_index": i,
+                }
+                results.append(result_entry)
+        
+        # Save final results from fallback
+        print(f"\nSaving final results to {output_file}...")
+        with open(output_file, 'w', encoding='utf-8') as f:
+            json.dump(results, f, indent=2, ensure_ascii=False)
+        
+        print(f"Fallback processing complete! Results saved to {output_file}")
+        print(f"Successfully processed {len(results)} questions")
 
 if __name__ == "__main__":
     main() 
