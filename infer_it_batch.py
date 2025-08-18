@@ -6,14 +6,17 @@ import json
 import time
 import gc
 
-# Model ID and device setup
-model_id = "Qwen/Qwen2.5-7B-Instruct"
-device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+# Configuration variables
+INPUT_FILE = "refusal_datasets/arditi_harmful_val.json"
+OUTPUT_FILE = "refusal_responses/arditi_refusal_val_it.json"
+BATCH_SIZE = 64
+MODEL_ID = "Qwen/Qwen2.5-7B-Instruct"
+DEVICE = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 # Initialize the tokenizer and model
-tokenizer = transformers.AutoTokenizer.from_pretrained(model_id)
+tokenizer = transformers.AutoTokenizer.from_pretrained(MODEL_ID)
 model = transformers.AutoModelForCausalLM.from_pretrained(
-    model_id, 
+    MODEL_ID, 
     torch_dtype=torch.bfloat16, 
     device_map="auto",
     attn_implementation="eager"  # Disable flash attention
@@ -59,7 +62,7 @@ Question: {question}\n"""
     
     return prompt
 
-def process_batch(questions, questions_data, output_file, batch_size=256):
+def process_batch(questions, questions_data, output_file, batch_size=BATCH_SIZE):
     """Process a batch of questions using the IT model"""
     
     # Prepare all prompts
@@ -82,7 +85,7 @@ def process_batch(questions, questions_data, output_file, batch_size=256):
             padding=True, 
             truncation=True,
             max_length=4096*2
-        ).to(device)
+        ).to(DEVICE)
         
         # Generate for the batch
         with torch.no_grad():
@@ -136,27 +139,22 @@ def process_batch(questions, questions_data, output_file, batch_size=256):
 
 def main():
     # Load the questions from the JSON file
-    input_file = "refusal_datasets/refusal_caa_restructured.json"
-    output_file = "refusal_responses/caa_refusal_responses_it.json"
-    
-    print(f"Loading questions from {input_file}...")
-    with open(input_file, 'r', encoding='utf-8') as f:
+    print(f"Loading questions from {INPUT_FILE}...")
+    with open(INPUT_FILE, 'r', encoding='utf-8') as f:
         questions_data = json.load(f)
     
     print(f"Found {len(questions_data)} questions to process")
     
     # Extract questions
-    questions = [item.get("question", "") for item in questions_data if item.get("question", "")]
+    questions = [item.get("instruction", "") or item.get("question", "") for item in questions_data if item.get("instruction", "") or item.get("question", "")]
     
     print(f"Processing {len(questions)} valid questions in batches...")
     
-    batch_size = 256
-    
     try:
         # Process all questions in batches with per-batch saving
-        all_responses = process_batch(questions, questions_data, output_file, batch_size=batch_size)
+        all_responses = process_batch(questions, questions_data, OUTPUT_FILE, batch_size=BATCH_SIZE)
         
-        print(f"Processing complete! Results saved to {output_file}")
+        print(f"Processing complete! Results saved to {OUTPUT_FILE}")
         print(f"Successfully processed {len(all_responses)} questions")
         
     except Exception as e:
@@ -166,7 +164,7 @@ def main():
         # Fallback to individual processing
         results = []
         for i, item in enumerate(questions_data):
-            question = item.get("question", "")
+            question = item.get("instruction", "") or item.get("question", "")
             if not question:
                 continue
                 
@@ -175,7 +173,7 @@ def main():
             try:
                 # Process single question
                 temp_data = [{"question": question}]
-                responses = process_batch([question], temp_data, output_file, batch_size=1)
+                responses = process_batch([question], temp_data, OUTPUT_FILE, batch_size=1)
                 response = responses[0] if responses else "ERROR: No response generated"
                 
                 result_entry = {
@@ -188,7 +186,7 @@ def main():
                 # Save progress every 20 questions
                 if (i + 1) % 20 == 0:
                     print(f"Saving progress... ({i+1}/{len(questions_data)})")
-                    with open(output_file, 'w', encoding='utf-8') as f:
+                    with open(OUTPUT_FILE, 'w', encoding='utf-8') as f:
                         json.dump(results, f, indent=2, ensure_ascii=False)
                 
             except Exception as individual_error:
@@ -201,11 +199,11 @@ def main():
                 results.append(result_entry)
         
         # Save final results from fallback
-        print(f"\nSaving final results to {output_file}...")
-        with open(output_file, 'w', encoding='utf-8') as f:
+        print(f"\nSaving final results to {OUTPUT_FILE}...")
+        with open(OUTPUT_FILE, 'w', encoding='utf-8') as f:
             json.dump(results, f, indent=2, ensure_ascii=False)
         
-        print(f"Fallback processing complete! Results saved to {output_file}")
+        print(f"Fallback processing complete! Results saved to {OUTPUT_FILE}")
         print(f"Successfully processed {len(results)} questions")
 
 if __name__ == "__main__":
