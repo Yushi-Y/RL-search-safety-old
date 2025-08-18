@@ -122,7 +122,10 @@ def process_single_question(question_text):
         input_ids = tokenizer.encode(current_prompt, return_tensors='pt').to(device)
         attention_mask = torch.ones_like(input_ids)
         
-        # Generate text with the stopping criteria
+        # Get the token ID for '<search>' to force it as first token
+        search_token_id = tokenizer.encode("<search>", add_special_tokens=False)[0]
+        
+        # Generate text with the stopping criteria and forced first token
         outputs = model.generate(
             input_ids,
             attention_mask=attention_mask,
@@ -131,7 +134,8 @@ def process_single_question(question_text):
             pad_token_id=tokenizer.eos_token_id,
             do_sample=True,
             temperature=0.7,
-            use_cache=True  # Enable KV caching for faster generation
+            use_cache=True,  # Enable KV caching for faster generation
+            forced_decoder_ids=[[0, search_token_id]]  # Force first token to be '<search>'
         )
 
         if outputs[0][-1].item() in curr_eos:

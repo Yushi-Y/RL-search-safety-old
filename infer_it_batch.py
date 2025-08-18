@@ -9,7 +9,7 @@ import gc
 # Configuration variables
 INPUT_FILE = "refusal_datasets/arditi_harmful_val.json"
 OUTPUT_FILE = "refusal_responses/arditi_refusal_val_it.json"
-BATCH_SIZE = 64
+BATCH_SIZE = 16
 MODEL_ID = "Qwen/Qwen2.5-7B-Instruct"
 DEVICE = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
@@ -116,24 +116,25 @@ def process_batch(questions, questions_data, output_file, batch_size=BATCH_SIZE)
             print("-" * 50)
             
             batch_results.append(output_text)
-        
-        # Add batch results to all results
-        all_results.extend(batch_results)
-        
-        # Create result entries for processed items so far
-        results = []
-        for idx, (item, response) in enumerate(zip(questions_data[:len(all_results)], all_results)):
-            result_entry = {
-                "question": item.get("question", ""),
-                "response": response,
-                "question_index": idx,
-            }
-            results.append(result_entry)
-        
-        # Save progress after each batch
-        print(f"\nSaving progress after batch {i//batch_size + 1}... ({len(all_results)}/{len(questions)} questions)")
-        with open(output_file, 'w', encoding='utf-8') as f:
-            json.dump(results, f, indent=2, ensure_ascii=False)
+            
+            # Add this result to all results
+            all_results.append(output_text)
+            
+            # Save progress every 10 questions
+            if len(all_results) % 10 == 0 or len(all_results) == len(questions):
+                # Create result entries for processed items so far
+                results = []
+                for idx, (item, response) in enumerate(zip(questions_data[:len(all_results)], all_results)):
+                    result_entry = {
+                        "question": item.get("instruction", "") or item.get("question", ""),
+                        "response": response,
+                        "question_index": idx,
+                    }
+                    results.append(result_entry)
+                
+                print(f"\nSaving progress... ({len(all_results)}/{len(questions)} questions)")
+                with open(output_file, 'w', encoding='utf-8') as f:
+                    json.dump(results, f, indent=2, ensure_ascii=False)
     
     return all_results
 
@@ -183,8 +184,8 @@ def main():
                 }
                 results.append(result_entry)
                 
-                # Save progress every 20 questions
-                if (i + 1) % 20 == 0:
+                # Save progress every 10 questions
+                if (i + 1) % 10 == 0:
                     print(f"Saving progress... ({i+1}/{len(questions_data)})")
                     with open(OUTPUT_FILE, 'w', encoding='utf-8') as f:
                         json.dump(results, f, indent=2, ensure_ascii=False)
