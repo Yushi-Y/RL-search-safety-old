@@ -7,8 +7,8 @@ import time
 import gc
 
 # Configuration variables
-INPUT_FILE = "refusal_datasets/arditi_harmful_val.json"
-OUTPUT_FILE = "refusal_responses/arditi_refusal_val_it.json"
+INPUT_FILE = "refusal_datasets/arditi_harmful_val_question.json"
+OUTPUT_FILE = "refusal_responses/arditi_refusal_val_question_it.json"
 BATCH_SIZE = 16
 MODEL_ID = "Qwen/Qwen2.5-7B-Instruct"
 DEVICE = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -96,7 +96,7 @@ def process_batch(questions, questions_data, output_file, batch_size=BATCH_SIZE)
                 stopping_criteria=stopping_criteria,
                 pad_token_id=tokenizer.eos_token_id,
                 do_sample=True,
-                temperature=0.7,
+                temperature=0.0,
                 use_cache=True  # Enable KV caching for faster generation
             )
         

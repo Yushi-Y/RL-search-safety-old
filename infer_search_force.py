@@ -9,7 +9,7 @@ import gc
 
 # Configuration variables
 INPUT_FILE = "refusal_datasets/arditi_harmful_val.json"
-OUTPUT_FILE = "refusal_responses/arditi_refusal_val_search.json"
+OUTPUT_FILE = "refusal_responses/arditi_refusal_val_search_force.json"
 BATCH_SIZE = 64
 
 # Model ID and device setup
@@ -119,13 +119,12 @@ def process_single_question(question_text):
     
     # Process the question with potential search iterations - same logic as infer_search.py
     while True:
-        input_ids = tokenizer.encode(current_prompt, return_tensors='pt').to(device)
+        # Prefill with "<search>" to force it as the first token
+        prefilled_prompt = current_prompt + "<search>"
+        input_ids = tokenizer.encode(prefilled_prompt, return_tensors='pt').to(device)
         attention_mask = torch.ones_like(input_ids)
         
-        # Get the token ID for '<search>' to force it as first token
-        search_token_id = tokenizer.encode("<search>", add_special_tokens=False)[0]
-        
-        # Generate text with the stopping criteria and forced first token
+        # Generate text with the stopping criteria (starting after the prefilled "<search>")
         outputs = model.generate(
             input_ids,
             attention_mask=attention_mask,
@@ -133,21 +132,22 @@ def process_single_question(question_text):
             stopping_criteria=stopping_criteria,
             pad_token_id=tokenizer.eos_token_id,
             do_sample=True,
-            temperature=0.7,
-            use_cache=True,  # Enable KV caching for faster generation
-            forced_decoder_ids=[[0, search_token_id]]  # Force first token to be '<search>'
+            temperature=0.0,
+            use_cache=True  # Enable KV caching for faster generation
         )
 
         if outputs[0][-1].item() in curr_eos:
             generated_tokens = outputs[0][input_ids.shape[1]:]
             output_text = tokenizer.decode(generated_tokens, skip_special_tokens=True)
-            full_response += output_text
-            print(output_text)
+            # Add the prefilled "<search>" to the response since it's not in generated_tokens
+            full_response += "<search>" + output_text
+            print("<search>" + output_text)
             break
 
         generated_tokens = outputs[0][input_ids.shape[1]:]
         output_text = tokenizer.decode(generated_tokens, skip_special_tokens=True)
-        full_response += output_text
+        # Add the prefilled "<search>" to the response since it's not in generated_tokens
+        full_response += "<search>" + output_text
         
         tmp_query = get_query(tokenizer.decode(outputs[0], skip_special_tokens=True))
         if tmp_query:
@@ -161,7 +161,7 @@ def process_single_question(question_text):
         else:
             search_results = ''
 
-        search_text = curr_search_template.format(output_text=output_text, search_results=search_results)
+        search_text = curr_search_template.format(output_text="<search>" + output_text, search_results=search_results)
         current_prompt += search_text
         cnt += 1
         print(search_text)

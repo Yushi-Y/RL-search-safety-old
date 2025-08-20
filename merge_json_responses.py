@@ -79,46 +79,47 @@ def load_json_with_cleaning(file_path):
                 raise
 
 def main():
-    # Load the IT responses
-    # it_file = "refusal_datasets/arditi_harmful_responses_it.json"
-    it_file = "refusal_responses/caa_refusal_responses_it.json"
-    print(f"Loading IT responses from {it_file}...")
-    it_data = load_json_with_cleaning(it_file)
+    # Load the IT merged responses
+    it_merged_file = "refusal_responses/arditi_refusal_val_it_merged.json"
+    print(f"Loading IT merged responses from {it_merged_file}...")
+    it_merged_data = load_json_with_cleaning(it_merged_file)
     
-    # Load the search responses
-    search_file = "refusal_responses/caa_refusal_responses_search.json"
-    print(f"Loading search responses from {search_file}...")
-    search_data = load_json_with_cleaning(search_file)
+    # Load the search merged responses
+    search_merged_file = "refusal_responses/arditi_refusal_val_search_merged.json"
+    print(f"Loading search merged responses from {search_merged_file}...")
+    search_merged_data = load_json_with_cleaning(search_merged_file)
     
-    print(f"Found {len(it_data)} IT responses and {len(search_data)} search responses")
+    print(f"Found {len(it_merged_data)} IT merged responses and {len(search_merged_data)} search merged responses")
     
     # Create a mapping of question_index to responses for easier lookup
-    it_map = {}
-    for item in it_data:
+    it_merged_map = {}
+    for item in it_merged_data:
         question_index = item.get("question_index")
         if question_index is not None:
-            it_map[question_index] = item
+            it_merged_map[question_index] = item
     
-    search_map = {}
-    for item in search_data:
+    search_merged_map = {}
+    for item in search_merged_data:
         question_index = item.get("question_index")
         if question_index is not None:
-            search_map[question_index] = item
+            search_merged_map[question_index] = item
     
     # Merge the responses by question_index
     merged_data = []
-    all_indices = set(it_map.keys()) | set(search_map.keys())
+    all_indices = set(it_merged_map.keys()) | set(search_merged_map.keys())
     
     print(f"Found {len(all_indices)} unique question indices to merge")
     
     for question_index in sorted(all_indices):
-        it_item = it_map.get(question_index, {})
-        search_item = search_map.get(question_index, {})
+        it_merged_item = it_merged_map.get(question_index, {})
+        search_merged_item = search_merged_map.get(question_index, {})
         
         merged_item = {
-            "question": it_item.get("question", search_item.get("question", "")),
-            "response_it": it_item.get("response", ""),
-            "response_search": search_item.get("response", ""),
+            "question": it_merged_item.get("question", search_merged_item.get("question", "")),
+            "response_question_it": it_merged_item.get("response_question_it", ""),
+            "response_it": it_merged_item.get("response_it", ""),
+            "response_question_search": search_merged_item.get("response_question_search", ""),
+            "response_search": search_merged_item.get("response_search", ""),
             "question_index": question_index
         }
         
@@ -128,7 +129,7 @@ def main():
             print(f"Processed {len(merged_data)}/{len(all_indices)} questions")
     
     # Save the merged data
-    output_file = "refusal_responses/caa_refusal_responses_merged.json"
+    output_file = "refusal_responses/arditi_refusal_val_all_merged.json"
     print(f"\nSaving merged data to {output_file}...")
     with open(output_file, 'w', encoding='utf-8') as f:
         json.dump(merged_data, f, indent=2, ensure_ascii=False)
@@ -137,9 +138,9 @@ def main():
     
     # Print summary statistics
     print(f"\nSummary:")
-    print(f"- Questions with both: {len(set(it_map.keys()) & set(search_map.keys()))}")
-    print(f"- Questions with only IT: {len(set(it_map.keys()) - set(search_map.keys()))}")
-    print(f"- Questions with only search: {len(set(search_map.keys()) - set(it_map.keys()))}")
+    print(f"- Questions with both IT and search: {len(set(it_merged_map.keys()) & set(search_merged_map.keys()))}")
+    print(f"- Questions with only IT: {len(set(it_merged_map.keys()) - set(search_merged_map.keys()))}")
+    print(f"- Questions with only search: {len(set(search_merged_map.keys()) - set(it_merged_map.keys()))}")
 
 if __name__ == "__main__":
     main() 

@@ -129,7 +129,7 @@ def process_single_question(question_text):
             stopping_criteria=stopping_criteria,
             pad_token_id=tokenizer.eos_token_id,
             do_sample=True,
-            temperature=0.7,
+            temperature=0.0,
             use_cache=True  # Enable KV caching for faster generation
         )
 

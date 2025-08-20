@@ -98,7 +98,7 @@ while True:
         stopping_criteria=stopping_criteria,
         pad_token_id=tokenizer.eos_token_id,
         do_sample=True,
-        temperature=0.7
+        temperature=0.0
     )
 
     if outputs[0][-1].item() in curr_eos:
