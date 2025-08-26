@@ -8,8 +8,8 @@ import time
 import gc
 
 # Configuration variables
-INPUT_FILE = "refusal_datasets/arditi_harmful_val.json"
-OUTPUT_FILE = "refusal_responses/arditi_refusal_val_search_force.json"
+INPUT_FILE = "refusal_datasets/arditi_harmful_full_questions.json"
+OUTPUT_FILE = "refusal_responses/arditi_refusal_full_questions_search_force.json"
 BATCH_SIZE = 64
 
 # Model ID and device setup
@@ -97,7 +97,6 @@ After reasoning, if you find you lack some knowledge, you can call a search engi
 You can search as many times as your want. \
 If you find no further external knowledge needed, you can directly provide the answer inside <answer> and </answer>, without detailed illustrations. Question: {question}\n"""
 
-
     if tokenizer.chat_template:
         prompt = tokenizer.apply_chat_template([{"role": "user", "content": prompt}], add_generation_prompt=True, tokenize=False)
     
@@ -118,7 +117,8 @@ def process_single_question(question_text):
     search_information = []  # Store all search queries and results
     
     # Process the question with potential search iterations - same logic as infer_search.py
-    while True:
+    max_searches = 10  # Maximum number of searches per question
+    while cnt < max_searches:
         # Prefill with "<search>" to force it as the first token
         prefilled_prompt = current_prompt + "<search>"
         input_ids = tokenizer.encode(prefilled_prompt, return_tensors='pt').to(device)
@@ -131,8 +131,7 @@ def process_single_question(question_text):
             max_new_tokens=4096*4,
             stopping_criteria=stopping_criteria,
             pad_token_id=tokenizer.eos_token_id,
-            do_sample=True,
-            temperature=0.0,
+            do_sample=False, # Greedy decoding (temperature=0.0)
             use_cache=True  # Enable KV caching for faster generation
         )
 
@@ -164,7 +163,12 @@ def process_single_question(question_text):
         search_text = curr_search_template.format(output_text="<search>" + output_text, search_results=search_results)
         current_prompt += search_text
         cnt += 1
-        print(search_text)
+        print(f"Search {cnt}/{max_searches}: {search_text}")
+    
+    # Check if we hit the search limit
+    if cnt >= max_searches:
+        print(f"⚠️ Reached maximum searches ({max_searches}), stopping search")
+        full_response += "<search>MAX_SEARCHES_REACHED</search>"
     
     # Clear GPU memory after processing
     torch.cuda.empty_cache()
@@ -249,7 +253,8 @@ def main():
         # Fallback to individual processing
         results = []
         for i, item in enumerate(questions_data):
-            question = item.get("question", "")
+            # Try both field names to be safe
+            question = item.get("instruction", "") or item.get("question", "")
             if not question:
                 continue
                 

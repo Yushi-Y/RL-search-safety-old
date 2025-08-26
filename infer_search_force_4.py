@@ -9,7 +9,7 @@ import gc
 
 # Configuration variables
 INPUT_FILE = "refusal_datasets/arditi_harmful_full_questions.json"
-OUTPUT_FILE = "refusal_responses/arditi_refusal_full_questions_search_force_2.json"
+OUTPUT_FILE = "refusal_responses/arditi_refusal_full_questions_search_force_4.json"
 BATCH_SIZE = 64
 
 # Model ID and device setup
@@ -120,7 +120,7 @@ def process_single_question(question_text):
     max_searches = 10  # Maximum number of searches per question
     while cnt < max_searches:
         # Prefill with "<think> I need to search for more information. </think>" to force it as the first token
-        prefilled_prompt = current_prompt + "<think> I need to search for more information. </think>"
+        prefilled_prompt = current_prompt + "<think>"
         input_ids = tokenizer.encode(prefilled_prompt, return_tensors='pt').to(device)
         attention_mask = torch.ones_like(input_ids)
         
@@ -139,14 +139,14 @@ def process_single_question(question_text):
             generated_tokens = outputs[0][input_ids.shape[1]:]
             output_text = tokenizer.decode(generated_tokens, skip_special_tokens=True)
             # Add the prefilled think tag to the response since it's not in generated_tokens
-            full_response += "<think> I need to search for more information. </think>" + output_text
-            print("<think> I need to search for more information. </think>" + output_text)
+            full_response += "<think>" + output_text
+            print("<think>" + output_text)
             break
 
         generated_tokens = outputs[0][input_ids.shape[1]:]
         output_text = tokenizer.decode(generated_tokens, skip_special_tokens=True)
         # Add the prefilled think tag to the response since it's not in generated_tokens
-        full_response += "<think> I need to search for more information. </think>" + output_text
+        full_response += "<think>" + output_text
         
         tmp_query = get_query(tokenizer.decode(outputs[0], skip_special_tokens=True))
         if tmp_query:
@@ -160,7 +160,7 @@ def process_single_question(question_text):
         else:
             search_results = ''
 
-        search_text = curr_search_template.format(output_text="<think> I need to search for more information. </think>" + output_text, search_results=search_results)
+        search_text = curr_search_template.format(output_text="<think>" + output_text, search_results=search_results)
         current_prompt += search_text
         cnt += 1
         print(f"Search {cnt}/{max_searches}: {search_text}")

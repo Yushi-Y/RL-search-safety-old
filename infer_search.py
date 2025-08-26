@@ -8,8 +8,8 @@ import time
 import gc
 
 # Configuration variables
-INPUT_FILE = "refusal_datasets/arditi_harmful_val_question.json"
-OUTPUT_FILE = "refusal_responses/arditi_refusal_val_question_search.json"
+INPUT_FILE = "refusal_datasets/arditi_harmful_full_questions.json"
+OUTPUT_FILE = "refusal_responses/arditi_refusal_full_questions_search.json"
 BATCH_SIZE = 64
 
 # Model ID and device setup
@@ -128,8 +128,7 @@ def process_single_question(question_text):
             max_new_tokens=4096*4,
             stopping_criteria=stopping_criteria,
             pad_token_id=tokenizer.eos_token_id,
-            do_sample=True,
-            temperature=0.0,
+            do_sample=False, # Greedy decoding (temperature=0.0)
             use_cache=True  # Enable KV caching for faster generation
         )
 
