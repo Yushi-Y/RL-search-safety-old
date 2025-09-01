@@ -9,8 +9,7 @@ import gc
 
 # Configuration variables
 INPUT_FILE = "refusal_datasets/arditi_harmful_full.json"
-OUTPUT_FILE = "refusal_responses/arditi_refusal_full_search_prompt_2.json"
-BATCH_SIZE = 64
+OUTPUT_FILE = "refusal_responses/refusal_full_search_prompt_2.json"
 
 # Model ID and device setup
 model_id = "PeterJinGo/SearchR1-nq_hotpotqa_train-qwen2.5-7b-it-em-ppo"
@@ -167,8 +166,8 @@ def process_single_question(question_text):
     
     return full_response, search_information
 
-def process_batch(questions, questions_data, output_file, batch_size=16):
-    """Process questions in batches with per-batch saving"""
+def process_questions_sequential(questions, questions_data, output_file, save_interval=10):
+    """Process questions sequentially with periodic saving"""
     
     results = []
     
@@ -194,8 +193,8 @@ def process_batch(questions, questions_data, output_file, batch_size=16):
             print(f"Search queries: {len(search_info)}")
             print("-" * 50)
             
-            # Save progress every 10 questions
-            if (i + 1) % 10 == 0 or (i + 1) == len(questions):
+            # Save progress every save_interval questions
+            if (i + 1) % save_interval == 0 or (i + 1) == len(questions):
                 print(f"\nSaving progress... ({i+1}/{len(questions)} questions)")
                 with open(output_file, 'w', encoding='utf-8') as f:
                     json.dump(results, f, indent=2, ensure_ascii=False)
@@ -226,19 +225,17 @@ def main():
     # Extract questions
     questions = [item.get("instruction", "") for item in questions_data if item.get("instruction", "")]
     
-    print(f"Processing {len(questions)} valid questions in batches...")
-    
-    batch_size = BATCH_SIZE
+    print(f"Processing {len(questions)} valid questions sequentially...")
     
     try:
-        # Process all questions with per-batch saving
-        all_responses = process_batch(questions, questions_data, OUTPUT_FILE, batch_size=batch_size)
+        # Process all questions sequentially with periodic saving
+        all_responses = process_questions_sequential(questions, questions_data, OUTPUT_FILE, save_interval=10)
         
         print(f"Processing complete! Results saved to {OUTPUT_FILE}")
         print(f"Successfully processed {len(all_responses)} questions")
         
     except Exception as e:
-        print(f"Error during batch processing: {e}")
+        print(f"Error during sequential processing: {e}")
         print("Falling back to individual processing...")
         
         # Fallback to individual processing

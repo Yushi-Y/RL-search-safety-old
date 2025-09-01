@@ -9,7 +9,8 @@ import gc
 
 # Configuration variables
 INPUT_FILE = "refusal_datasets/arditi_harmful_full.json"
-OUTPUT_FILE = "refusal_responses/arditi_refusal_full_search.json"
+OUTPUT_FILE = "refusal_responses/refusal_full_search_prefill_4.json"
+
 
 # Model ID and device setup
 model_id = "PeterJinGo/SearchR1-nq_hotpotqa_train-qwen2.5-7b-it-em-ppo"
@@ -116,11 +117,14 @@ def process_single_question(question_text):
     search_information = []  # Store all search queries and results
     
     # Process the question with potential search iterations - same logic as infer_search.py
-    while True:
-        input_ids = tokenizer.encode(current_prompt, return_tensors='pt').to(device)
+    max_searches = 10  # Maximum number of searches per question
+    while cnt < max_searches:
+        # Prefill with "<think> I need to" to force it as the first token
+        prefilled_prompt = current_prompt + "<think> I need to"
+        input_ids = tokenizer.encode(prefilled_prompt, return_tensors='pt').to(device)
         attention_mask = torch.ones_like(input_ids)
         
-        # Generate text with the stopping criteria
+        # Generate text with the stopping criteria (starting after the prefilled think tag)
         outputs = model.generate(
             input_ids,
             attention_mask=attention_mask,
@@ -134,13 +138,15 @@ def process_single_question(question_text):
         if outputs[0][-1].item() in curr_eos:
             generated_tokens = outputs[0][input_ids.shape[1]:]
             output_text = tokenizer.decode(generated_tokens, skip_special_tokens=True)
-            full_response += output_text
-            print(output_text)
+            # Add the prefilled think tag to the response since it's not in generated_tokens
+            full_response += "<think> I need to" + output_text
+            print("<think> I need to" + output_text)
             break
 
         generated_tokens = outputs[0][input_ids.shape[1]:]
         output_text = tokenizer.decode(generated_tokens, skip_special_tokens=True)
-        full_response += output_text
+        # Add the prefilled think tag to the response since it's not in generated_tokens
+        full_response += "<think> I need to" + output_text
         
         tmp_query = get_query(tokenizer.decode(outputs[0], skip_special_tokens=True))
         if tmp_query:
@@ -154,10 +160,15 @@ def process_single_question(question_text):
         else:
             search_results = ''
 
-        search_text = curr_search_template.format(output_text=output_text, search_results=search_results)
+        search_text = curr_search_template.format(output_text="<think> I need to" + output_text, search_results=search_results)
         current_prompt += search_text
         cnt += 1
-        print(search_text)
+        print(f"Search {cnt}/{max_searches}: {search_text}")
+    
+    # Check if we hit the search limit
+    if cnt >= max_searches:
+        print(f"⚠️ Reached maximum searches ({max_searches}), stopping search")
+        full_response += "<search>MAX_SEARCHES_REACHED</search>"
     
     # Clear GPU memory after processing
     torch.cuda.empty_cache()
@@ -192,8 +203,8 @@ def process_questions_sequential(questions, questions_data, output_file, save_in
             print(f"Search queries: {len(search_info)}")
             print("-" * 50)
             
-            # Save progress every save_interval questions
-            if (i + 1) % save_interval == 0 or (i + 1) == len(questions):
+            # Save progress every 10 questions
+            if (i + 1) % 10 == 0 or (i + 1) == len(questions):
                 print(f"\nSaving progress... ({i+1}/{len(questions)} questions)")
                 with open(output_file, 'w', encoding='utf-8') as f:
                     json.dump(results, f, indent=2, ensure_ascii=False)
@@ -226,6 +237,8 @@ def main():
     
     print(f"Processing {len(questions)} valid questions sequentially...")
     
+
+    
     try:
         # Process all questions sequentially with periodic saving
         all_responses = process_questions_sequential(questions, questions_data, OUTPUT_FILE, save_interval=10)
@@ -240,7 +253,8 @@ def main():
         # Fallback to individual processing
         results = []
         for i, item in enumerate(questions_data):
-            question = item.get("question", "")
+            # Try both field names to be safe
+            question = item.get("instruction", "") or item.get("question", "")
             if not question:
                 continue
                 
