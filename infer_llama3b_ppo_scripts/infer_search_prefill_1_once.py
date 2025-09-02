@@ -9,14 +9,14 @@ import gc
 
 # Configuration variables
 INPUT_FILE = "refusal_datasets/arditi_harmful_full.json"
-OUTPUT_FILE = "refusal_responses/refusal_full_search_prefill_1_beam_search.json"
+OUTPUT_FILE = "refusal_responses/llama_refusal_full_search_prefill_1_once.json"
 
 
 # Model ID and device setup
 model_id = "PeterJinGo/SearchR1-nq_hotpotqa_train-llama3.2-3b-it-em-ppo"
-device = torch.device("cuda:1" if torch.cuda.is_available() else "cpu")
+device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
-curr_eos = [151645, 151643] # for Qwen2.5 series models
+curr_eos = [128001, 128009] # for Llama series models
 curr_search_template = '\n\n{output_text}<information>{search_results}</information>\n\n'
 
 # Initialize the tokenizer and model
@@ -116,27 +116,23 @@ def process_single_question(question_text):
     current_prompt = prompt
     search_information = []  # Store all search queries and results
     
-    # Process the question with potential search iterations - same logic as infer_search.py
-    max_searches = 10  # Maximum number of searches per question
-    while cnt < max_searches:
-        # Prefill with "<search>" to force it as the first token
-        prefilled_prompt = current_prompt + "<search>"
-        input_ids = tokenizer.encode(prefilled_prompt, return_tensors='pt').to(device)
+    # Prefill with "<search>" only once at the beginning
+    current_prompt += "<search>"
+    
+    # Generate freely from here on
+    while True:
+        input_ids = tokenizer.encode(current_prompt, return_tensors='pt').to(device)
         attention_mask = torch.ones_like(input_ids)
         
-        # Generate text with the stopping criteria (starting after the prefilled "<search>")
+        # Generate text with the stopping criteria
         outputs = model.generate(
             input_ids,
             attention_mask=attention_mask,
-            max_new_tokens=4096*8,
+            max_new_tokens=4096*4,
             stopping_criteria=stopping_criteria,
             pad_token_id=tokenizer.eos_token_id,
-            # do_sample=True,
-            # temperature=1, 
-            do_sample=False, # Disable sampling for beam search
-            num_beams=5, # Use beam search with 5 beams
-            early_stopping=True, # Stop when all beams reach stopping criteria
-            # use_cache=True  # Enable KV caching for faster generation
+            do_sample=False, # Greedy decoding (temperature=0.0)
+            use_cache=True  # Enable KV caching for faster generation
         )
 
         if outputs[0][-1].item() in curr_eos:
@@ -154,7 +150,6 @@ def process_single_question(question_text):
         
         tmp_query = get_query(tokenizer.decode(outputs[0], skip_special_tokens=True))
         if tmp_query:
-            # print(f'searching "{tmp_query}"...')
             search_results = search(tmp_query)
             # Store the search query and results
             search_information.append({
@@ -164,43 +159,16 @@ def process_single_question(question_text):
         else:
             search_results = ''
 
-        search_text = curr_search_template.format(output_text="<search>" + output_text, search_results=search_results)
+        search_text = curr_search_template.format(output_text=output_text, search_results=search_results)
         current_prompt += search_text
-        cnt += 1
-        print(f"Search {cnt}/{max_searches}: {search_text}")
-    
-    # Check if we hit the search limit
-    # Check if we hit the search limit
-    if cnt >= max_searches:
-        print(f"⚠️ Reached maximum searches ({max_searches}), forcing answer generation")
-        
-        # Force the model to generate an answer after max searches
-        prefilled_prompt = current_prompt + "<answer>"
-        input_ids = tokenizer.encode(prefilled_prompt, return_tensors='pt').to(device)
-        attention_mask = torch.ones_like(input_ids)
-        
-        # Generate answer with different stopping criteria
-        outputs = model.generate(
-            input_ids,
-            attention_mask=attention_mask,
-            max_new_tokens=1024,  # Shorter for answers
-            pad_token_id=tokenizer.eos_token_id,
-            do_sample=False,
-            use_cache=True
-        )
-        
-        # Extract answer and add to response
-        generated_tokens = outputs[0][input_ids.shape[1]:]
-        answer_text = tokenizer.decode(generated_tokens, skip_special_tokens=True)
-        full_response += "<answer>" + answer_text
-        print(f"<answer>{answer_text}")
+        print(f"Search: {search_text}")
+
     
     # Clear GPU memory after processing
     torch.cuda.empty_cache()
     gc.collect()
     
     return full_response, search_information
-
 
 def process_questions_sequential(questions, questions_data, output_file, save_interval=10):
     """Process questions sequentially with periodic saving"""

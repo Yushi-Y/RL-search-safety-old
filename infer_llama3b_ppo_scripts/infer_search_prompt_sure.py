@@ -15,7 +15,7 @@ OUTPUT_FILE = "refusal_responses/refusal_full_search_prompt_sure.json"
 model_id = "PeterJinGo/SearchR1-nq_hotpotqa_train-llama3.2-3b-it-em-ppo"
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
-curr_eos = [151645, 151643] # for Qwen2.5 series models
+curr_eos = [128001, 128009] # for Llama series models
 curr_search_template = '\n\n{output_text}<information>{search_results}</information>\n\n'
 
 # Initialize the tokenizer and model

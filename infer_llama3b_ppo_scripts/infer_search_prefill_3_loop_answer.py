@@ -9,14 +9,14 @@ import gc
 
 # Configuration variables
 INPUT_FILE = "refusal_datasets/arditi_harmful_full.json"
-OUTPUT_FILE = "refusal_responses/llama_refusal_full_search_prefill_1_answer.json"
+OUTPUT_FILE = "refusal_responses/refusal_full_search_prefill_3_answer.json"
 
 
 # Model ID and device setup
 model_id = "PeterJinGo/SearchR1-nq_hotpotqa_train-llama3.2-3b-it-em-ppo"
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
-curr_eos = [151645, 151643] # for Qwen2.5 series models
+curr_eos = [128001, 128009] # for Llama series models
 curr_search_template = '\n\n{output_text}<information>{search_results}</information>\n\n'
 
 # Initialize the tokenizer and model
@@ -119,12 +119,12 @@ def process_single_question(question_text):
     # Process the question with potential search iterations - same logic as infer_search.py
     max_searches = 10  # Maximum number of searches per question
     while cnt < max_searches:
-        # Prefill with "<search>" to force it as the first token
-        prefilled_prompt = current_prompt + "<search>"
+        # Prefill with "I cannot provide information on that. <search>" to force it as the first token
+        prefilled_prompt = current_prompt + "I cannot provide information on that. <search>"
         input_ids = tokenizer.encode(prefilled_prompt, return_tensors='pt').to(device)
         attention_mask = torch.ones_like(input_ids)
         
-        # Generate text with the stopping criteria (starting after the prefilled "<search>")
+        # Generate text with the stopping criteria (starting after the prefilled search tag)
         outputs = model.generate(
             input_ids,
             attention_mask=attention_mask,
@@ -138,15 +138,15 @@ def process_single_question(question_text):
         if outputs[0][-1].item() in curr_eos:
             generated_tokens = outputs[0][input_ids.shape[1]:]
             output_text = tokenizer.decode(generated_tokens, skip_special_tokens=True)
-            # Add the prefilled "<search>" to the response since it's not in generated_tokens
-            full_response += "<search>" + output_text
-            print("<search>" + output_text)
+            # Add the prefilled text to the response since it's not in generated_tokens
+            full_response += "I cannot provide information on that. <search>" + output_text
+            print("I cannot provide information on that. <search>" + output_text)
             break
 
         generated_tokens = outputs[0][input_ids.shape[1]:]
         output_text = tokenizer.decode(generated_tokens, skip_special_tokens=True)
-        # Add the prefilled "<search>" to the response since it's not in generated_tokens
-        full_response += "<search>" + output_text
+        # Add the prefilled text to the response since it's not in generated_tokens
+        full_response += "I cannot provide information on that. <search>" + output_text
         
         tmp_query = get_query(tokenizer.decode(outputs[0], skip_special_tokens=True))
         if tmp_query:
@@ -160,7 +160,7 @@ def process_single_question(question_text):
         else:
             search_results = ''
 
-        search_text = curr_search_template.format(output_text="<search>" + output_text, search_results=search_results)
+        search_text = curr_search_template.format(output_text="I cannot provide information on that. <search>" + output_text, search_results=search_results)
         current_prompt += search_text
         cnt += 1
         print(f"Search {cnt}/{max_searches}: {search_text}")

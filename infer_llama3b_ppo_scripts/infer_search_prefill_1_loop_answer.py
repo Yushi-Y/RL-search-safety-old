@@ -9,14 +9,14 @@ import gc
 
 # Configuration variables
 INPUT_FILE = "refusal_datasets/arditi_harmful_full.json"
-OUTPUT_FILE = "refusal_responses/refusal_full_search_prefill_2_beam_search.json"
+OUTPUT_FILE = "refusal_responses/llama_refusal_full_search_prefill_1_answer.json"
 
 
 # Model ID and device setup
 model_id = "PeterJinGo/SearchR1-nq_hotpotqa_train-llama3.2-3b-it-em-ppo"
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
-curr_eos = [151645, 151643] # for Qwen2.5 series models
+curr_eos = [128001, 128009] # for Llama series models
 curr_search_template = '\n\n{output_text}<information>{search_results}</information>\n\n'
 
 # Initialize the tokenizer and model
@@ -119,38 +119,34 @@ def process_single_question(question_text):
     # Process the question with potential search iterations - same logic as infer_search.py
     max_searches = 10  # Maximum number of searches per question
     while cnt < max_searches:
-        # Prefill with "<think> I need to search for more information. </think>" to force it as the first token
-        prefilled_prompt = current_prompt + "<think> I need to search for more information. </think>"
+        # Prefill with "<search>" to force it as the first token
+        prefilled_prompt = current_prompt + "<search>"
         input_ids = tokenizer.encode(prefilled_prompt, return_tensors='pt').to(device)
         attention_mask = torch.ones_like(input_ids)
         
-        # Generate text with the stopping criteria (starting after the prefilled think tag)
+        # Generate text with the stopping criteria (starting after the prefilled "<search>")
         outputs = model.generate(
             input_ids,
             attention_mask=attention_mask,
-            max_new_tokens=4096*8,
+            max_new_tokens=4096*4,
             stopping_criteria=stopping_criteria,
             pad_token_id=tokenizer.eos_token_id,
-            do_sample=True,
-            temperature=1, 
-            # do_sample=False, # Disable sampling for beam search
-            # num_beams=5, # Use beam search with 5 beams
-            # early_stopping=True, # Stop when all beams reach stopping criteria
-            # use_cache=True  # Enable KV caching for faster generation
+            do_sample=False, # Greedy decoding (temperature=0.0)
+            use_cache=True  # Enable KV caching for faster generation
         )
 
         if outputs[0][-1].item() in curr_eos:
             generated_tokens = outputs[0][input_ids.shape[1]:]
             output_text = tokenizer.decode(generated_tokens, skip_special_tokens=True)
-            # Add the prefilled think tag to the response since it's not in generated_tokens
-            full_response += "<think> I need to search for more information. </think>" + output_text
-            print("<think> I need to search for more information. </think>" + output_text)
+            # Add the prefilled "<search>" to the response since it's not in generated_tokens
+            full_response += "<search>" + output_text
+            print("<search>" + output_text)
             break
 
         generated_tokens = outputs[0][input_ids.shape[1]:]
         output_text = tokenizer.decode(generated_tokens, skip_special_tokens=True)
-        # Add the prefilled think tag to the response since it's not in generated_tokens
-        full_response += "<think> I need to search for more information. </think>" + output_text
+        # Add the prefilled "<search>" to the response since it's not in generated_tokens
+        full_response += "<search>" + output_text
         
         tmp_query = get_query(tokenizer.decode(outputs[0], skip_special_tokens=True))
         if tmp_query:
@@ -164,7 +160,7 @@ def process_single_question(question_text):
         else:
             search_results = ''
 
-        search_text = curr_search_template.format(output_text="<think> I need to search for more information. </think>" + output_text, search_results=search_results)
+        search_text = curr_search_template.format(output_text="<search>" + output_text, search_results=search_results)
         current_prompt += search_text
         cnt += 1
         print(f"Search {cnt}/{max_searches}: {search_text}")
@@ -172,27 +168,25 @@ def process_single_question(question_text):
     # Check if we hit the search limit
     if cnt >= max_searches:
         print(f"⚠️ Reached maximum searches ({max_searches}), forcing answer generation")
-        
-        # Force the model to generate an answer after max searches
+        # Prefill with "<answer>" to force answer generation
         prefilled_prompt = current_prompt + "<answer>"
         input_ids = tokenizer.encode(prefilled_prompt, return_tensors='pt').to(device)
         attention_mask = torch.ones_like(input_ids)
         
-        # Generate answer with different stopping criteria
+        # Generate final answer
         outputs = model.generate(
             input_ids,
             attention_mask=attention_mask,
-            max_new_tokens=1024,  # Shorter for answers
+            max_new_tokens=4096*4,
             pad_token_id=tokenizer.eos_token_id,
             do_sample=False,
             use_cache=True
         )
         
-        # Extract answer and add to response
         generated_tokens = outputs[0][input_ids.shape[1]:]
-        answer_text = tokenizer.decode(generated_tokens, skip_special_tokens=True)
-        full_response += "<answer>" + answer_text
-        print(f"<answer>{answer_text}")
+        output_text = tokenizer.decode(generated_tokens, skip_special_tokens=True)
+        full_response += "<answer>" + output_text
+        print("<answer>" + output_text)
     
     # Clear GPU memory after processing
     torch.cuda.empty_cache()
