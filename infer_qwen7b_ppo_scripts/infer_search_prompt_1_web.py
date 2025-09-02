@@ -10,7 +10,7 @@ import os
 
 # Configuration variables
 INPUT_FILE = "refusal_datasets/arditi_harmful_full.json"
-OUTPUT_FILE = "refusal_responses/refusal_full_search_prompt_1web.json"
+OUTPUT_FILE = "refusal_responses/qwen_refusal_full_search_prompt_1_web.json"
 
 # SerpAPI Configuration
 SERPAPI_KEY = os.getenv("SERPAPI_KEY", "3d99e8ffaa22f79c3cb3130cee2813630469f544cb201f79ecee30c508a4c2e3")  # Set your SerpAPI key as environment variable
