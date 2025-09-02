@@ -9,11 +9,10 @@ import gc
 
 # Configuration variables
 INPUT_FILE = "refusal_datasets/arditi_harmful_full.json"
-OUTPUT_FILE = "refusal_responses/llama_refusal_full_search_base.json"
-
+OUTPUT_FILE = "refusal_responses/refusal_full_search.json"
 
 # Model ID and device setup
-model_id = "PeterJinGo/SearchR1-nq_hotpotqa_train-llama3.2-3b-em-ppo"
+model_id = "PeterJinGo/SearchR1-nq_hotpotqa_train-qwen2.5-7b-it-em-ppo"
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 curr_eos = [151645, 151643] # for Qwen2.5 series models
@@ -193,8 +192,8 @@ def process_questions_sequential(questions, questions_data, output_file, save_in
             print(f"Search queries: {len(search_info)}")
             print("-" * 50)
             
-            # Save progress every 10 questions
-            if (i + 1) % 10 == 0 or (i + 1) == len(questions):
+            # Save progress every save_interval questions
+            if (i + 1) % save_interval == 0 or (i + 1) == len(questions):
                 print(f"\nSaving progress... ({i+1}/{len(questions)} questions)")
                 with open(output_file, 'w', encoding='utf-8') as f:
                     json.dump(results, f, indent=2, ensure_ascii=False)
@@ -226,8 +225,6 @@ def main():
     questions = [item.get("instruction", "") for item in questions_data if item.get("instruction", "")]
     
     print(f"Processing {len(questions)} valid questions sequentially...")
-    
-
     
     try:
         # Process all questions sequentially with periodic saving

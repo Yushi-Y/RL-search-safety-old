@@ -9,7 +9,8 @@ import gc
 
 # Configuration variables
 INPUT_FILE = "refusal_datasets/arditi_harmful_full.json"
-OUTPUT_FILE = "refusal_responses/arditi_refusal_full_search.json"
+OUTPUT_FILE = "refusal_responses/qwen_refusal_full_search_prefill_1_once.json"
+
 
 # Model ID and device setup
 model_id = "PeterJinGo/SearchR1-nq_hotpotqa_train-qwen2.5-7b-it-em-ppo"
@@ -115,7 +116,10 @@ def process_single_question(question_text):
     current_prompt = prompt
     search_information = []  # Store all search queries and results
     
-    # Process the question with potential search iterations - same logic as infer_search.py
+    # Prefill with "<search>" only once at the beginning
+    current_prompt += "<search>"
+    
+    # Generate freely from here on
     while True:
         input_ids = tokenizer.encode(current_prompt, return_tensors='pt').to(device)
         attention_mask = torch.ones_like(input_ids)
@@ -144,7 +148,6 @@ def process_single_question(question_text):
         
         tmp_query = get_query(tokenizer.decode(outputs[0], skip_special_tokens=True))
         if tmp_query:
-            # print(f'searching "{tmp_query}"...')
             search_results = search(tmp_query)
             # Store the search query and results
             search_information.append({
@@ -156,8 +159,8 @@ def process_single_question(question_text):
 
         search_text = curr_search_template.format(output_text=output_text, search_results=search_results)
         current_prompt += search_text
-        cnt += 1
-        print(search_text)
+        print(f"Search: {search_text}")
+
     
     # Clear GPU memory after processing
     torch.cuda.empty_cache()
@@ -192,8 +195,8 @@ def process_questions_sequential(questions, questions_data, output_file, save_in
             print(f"Search queries: {len(search_info)}")
             print("-" * 50)
             
-            # Save progress every save_interval questions
-            if (i + 1) % save_interval == 0 or (i + 1) == len(questions):
+            # Save progress every 10 questions
+            if (i + 1) % 10 == 0 or (i + 1) == len(questions):
                 print(f"\nSaving progress... ({i+1}/{len(questions)} questions)")
                 with open(output_file, 'w', encoding='utf-8') as f:
                     json.dump(results, f, indent=2, ensure_ascii=False)
@@ -226,6 +229,8 @@ def main():
     
     print(f"Processing {len(questions)} valid questions sequentially...")
     
+
+    
     try:
         # Process all questions sequentially with periodic saving
         all_responses = process_questions_sequential(questions, questions_data, OUTPUT_FILE, save_interval=10)
@@ -240,7 +245,8 @@ def main():
         # Fallback to individual processing
         results = []
         for i, item in enumerate(questions_data):
-            question = item.get("question", "")
+            # Try both field names to be safe
+            question = item.get("instruction", "") or item.get("question", "")
             if not question:
                 continue
                 

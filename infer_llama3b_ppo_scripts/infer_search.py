@@ -9,10 +9,10 @@ import gc
 
 # Configuration variables
 INPUT_FILE = "refusal_datasets/arditi_harmful_full.json"
-OUTPUT_FILE = "refusal_responses/refusal_full_search.json"
+OUTPUT_FILE = "refusal_responses/llama_refusal_full_search.json"
 
 # Model ID and device setup
-model_id = "PeterJinGo/SearchR1-nq_hotpotqa_train-qwen2.5-3b-it-em-grpo"
+model_id = "PeterJinGo/SearchR1-nq_hotpotqa_train-llama3.2-3b-it-em-ppo"
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 curr_eos = [151645, 151643] # for Qwen2.5 series models

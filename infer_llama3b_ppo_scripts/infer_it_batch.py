@@ -9,12 +9,17 @@ import gc
 # Configuration variables
 INPUT_FILE = "refusal_datasets/arditi_harmful_full.json"
 OUTPUT_FILE = "refusal_responses/refusal_full_it.json"
-BATCH_SIZE = 16
+BATCH_SIZE = 32
 MODEL_ID = "meta-llama/Llama-3.2-3B-Instruct"
 DEVICE = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 # Initialize the tokenizer and model
 tokenizer = transformers.AutoTokenizer.from_pretrained(MODEL_ID)
+
+# Set padding token if it doesn't exist
+if tokenizer.pad_token is None:
+    tokenizer.pad_token = tokenizer.eos_token
+
 model = transformers.AutoModelForCausalLM.from_pretrained(
     MODEL_ID, 
     torch_dtype=torch.bfloat16, 
@@ -95,8 +100,7 @@ def process_batch(questions, questions_data, output_file, batch_size=BATCH_SIZE)
                 max_new_tokens=4096*2,
                 stopping_criteria=stopping_criteria,
                 pad_token_id=tokenizer.eos_token_id,
-                do_sample=True,
-                temperature=0.0,
+                do_sample=False,  # Greedy decoding (deterministic)
                 use_cache=True  # Enable KV caching for faster generation
             )
         

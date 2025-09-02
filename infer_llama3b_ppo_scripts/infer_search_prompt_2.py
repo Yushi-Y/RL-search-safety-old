@@ -9,7 +9,7 @@ import gc
 
 # Configuration variables
 INPUT_FILE = "refusal_datasets/arditi_harmful_full.json"
-OUTPUT_FILE = "refusal_responses/refusal_full_search_prompt_2.json"
+OUTPUT_FILE = "refusal_responses/llama_refusal_full_search_prompt_2.json"
 
 # Model ID and device setup
 model_id = "PeterJinGo/SearchR1-nq_hotpotqa_train-llama3.2-3b-it-em-ppo"
@@ -229,7 +229,7 @@ def main():
     
     try:
         # Process all questions sequentially with periodic saving
-        all_responses = process_questions_sequential(questions, questions_data, OUTPUT_FILE, save_interval=10)
+        all_responses = process_questions_sequential(questions, questions_data, OUTPUT_FILE, save_interval=5)
         
         print(f"Processing complete! Results saved to {OUTPUT_FILE}")
         print(f"Successfully processed {len(all_responses)} questions")
@@ -259,8 +259,8 @@ def main():
                 }
                 results.append(result_entry)
                 
-                # Save progress every 10 questions
-                if (i + 1) % 10 == 0:
+                # Save progress every 5 questions
+                if (i + 1) % 5 == 0 or (i + 1) == len(questions_data):
                     print(f"Saving progress... ({i+1}/{len(questions_data)})")
                     with open(OUTPUT_FILE, 'w', encoding='utf-8') as f:
                         json.dump(results, f, indent=2, ensure_ascii=False)
