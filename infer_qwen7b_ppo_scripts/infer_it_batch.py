@@ -7,9 +7,9 @@ import time
 import gc
 
 # Configuration variables
-INPUT_FILE = "refusal_datasets/arditi_harmful_val_question.json"
-OUTPUT_FILE = "refusal_responses/refusal_val_question_it.json"
-BATCH_SIZE = 16
+INPUT_FILE = "refusal_datasets/arditi_harmful_full.json"
+OUTPUT_FILE = "refusal_responses/qwen_refusal_full_it.json"
+BATCH_SIZE = 32
 MODEL_ID = "Qwen/Qwen2.5-7B-Instruct"
 DEVICE = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 

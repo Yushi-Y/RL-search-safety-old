@@ -8,9 +8,9 @@ import gc
 
 # Configuration variables
 INPUT_FILE = "refusal_datasets/arditi_harmful_full.json"
-OUTPUT_FILE = "refusal_responses/llama_refusal_full_it.json"
-BATCH_SIZE = 32
-MODEL_ID = "meta-llama/Llama-3.2-3B-Instruct"
+OUTPUT_FILE = "refusal_responses/qwen14b_refusal_full_it.json"
+BATCH_SIZE = 1
+MODEL_ID = "Qwen/Qwen2.5-14B-Instruct"
 DEVICE = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 # Initialize the tokenizer and model
@@ -97,7 +97,7 @@ def process_batch(questions, questions_data, output_file, batch_size=BATCH_SIZE)
             outputs = model.generate(
                 encoded.input_ids,
                 attention_mask=encoded.attention_mask,
-                max_new_tokens=4096*2,
+                max_new_tokens=4096*4,
                 stopping_criteria=stopping_criteria,
                 pad_token_id=tokenizer.eos_token_id,
                 do_sample=False,  # Greedy decoding (deterministic)

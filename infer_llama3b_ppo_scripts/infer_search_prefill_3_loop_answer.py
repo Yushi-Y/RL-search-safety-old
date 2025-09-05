@@ -9,7 +9,7 @@ import gc
 
 # Configuration variables
 INPUT_FILE = "refusal_datasets/arditi_harmful_full.json"
-OUTPUT_FILE = "refusal_responses/refusal_full_search_prefill_3_answer.json"
+OUTPUT_FILE = "refusal_responses/llama_refusal_full_search_prefill_3_loop_answer.json"
 
 
 # Model ID and device setup

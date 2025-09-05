@@ -9,14 +9,14 @@ import gc
 
 # Configuration variables
 INPUT_FILE = "refusal_datasets/arditi_harmful_full.json"
-OUTPUT_FILE = "refusal_responses/llama_refusal_full_search_base.json"
+OUTPUT_FILE = "refusal_responses/qwen14b_refusal_full_search_prefill_2_loop_answer.json"
 
 
 # Model ID and device setup
-model_id = "PeterJinGo/SearchR1-nq_hotpotqa_train-llama3.2-3b-em-ppo"
+model_id = "PeterJinGo/SearchR1-nq_hotpotqa_train-qwen2.5-14b-it-em-ppo-v0.2"
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
-curr_eos = [128001, 128009] # for Llama series models
+curr_eos = [151645, 151643] # for Qwen2.5 series models
 curr_search_template = '\n\n{output_text}<information>{search_results}</information>\n\n'
 
 # Initialize the tokenizer and model
@@ -117,11 +117,14 @@ def process_single_question(question_text):
     search_information = []  # Store all search queries and results
     
     # Process the question with potential search iterations - same logic as infer_search.py
-    while True:
-        input_ids = tokenizer.encode(current_prompt, return_tensors='pt').to(device)
+    max_searches = 10  # Maximum number of searches per question
+    while cnt < max_searches:
+        # Prefill with "<think> I need to search for more information. </think>" to force it as the first token
+        prefilled_prompt = current_prompt + "<think> I need to search for more information. </think>"
+        input_ids = tokenizer.encode(prefilled_prompt, return_tensors='pt').to(device)
         attention_mask = torch.ones_like(input_ids)
         
-        # Generate text with the stopping criteria
+        # Generate text with the stopping criteria (starting after the prefilled think tag)
         outputs = model.generate(
             input_ids,
             attention_mask=attention_mask,
@@ -135,13 +138,15 @@ def process_single_question(question_text):
         if outputs[0][-1].item() in curr_eos:
             generated_tokens = outputs[0][input_ids.shape[1]:]
             output_text = tokenizer.decode(generated_tokens, skip_special_tokens=True)
-            full_response += output_text
-            print(output_text)
+            # Add the prefilled think tag to the response since it's not in generated_tokens
+            full_response += "<think> I need to search for more information. </think>" + output_text
+            print("<think> I need to search for more information. </think>" + output_text)
             break
 
         generated_tokens = outputs[0][input_ids.shape[1]:]
         output_text = tokenizer.decode(generated_tokens, skip_special_tokens=True)
-        full_response += output_text
+        # Add the prefilled think tag to the response since it's not in generated_tokens
+        full_response += "<think> I need to search for more information. </think>" + output_text
         
         tmp_query = get_query(tokenizer.decode(outputs[0], skip_special_tokens=True))
         if tmp_query:
@@ -155,10 +160,33 @@ def process_single_question(question_text):
         else:
             search_results = ''
 
-        search_text = curr_search_template.format(output_text=output_text, search_results=search_results)
+        search_text = curr_search_template.format(output_text="<think> I need to search for more information. </think>" + output_text, search_results=search_results)
         current_prompt += search_text
         cnt += 1
-        print(search_text)
+        print(f"Search {cnt}/{max_searches}: {search_text}")
+    
+    # Check if we hit the search limit
+    if cnt >= max_searches:
+        print(f"⚠️ Reached maximum searches ({max_searches}), forcing answer generation")
+        # Prefill with "<answer>" to force answer generation
+        prefilled_prompt = current_prompt + "<answer>"
+        input_ids = tokenizer.encode(prefilled_prompt, return_tensors='pt').to(device)
+        attention_mask = torch.ones_like(input_ids)
+        
+        # Generate final answer
+        outputs = model.generate(
+            input_ids,
+            attention_mask=attention_mask,
+            max_new_tokens=4096*4,
+            pad_token_id=tokenizer.eos_token_id,
+            do_sample=False,
+            use_cache=True
+        )
+        
+        generated_tokens = outputs[0][input_ids.shape[1]:]
+        output_text = tokenizer.decode(generated_tokens, skip_special_tokens=True)
+        full_response += "<answer>" + output_text
+        print("<answer>" + output_text)
     
     # Clear GPU memory after processing
     torch.cuda.empty_cache()
@@ -193,8 +221,8 @@ def process_questions_sequential(questions, questions_data, output_file, save_in
             print(f"Search queries: {len(search_info)}")
             print("-" * 50)
             
-            # Save progress every 5 questions
-            if (i + 1) % 5 == 0 or (i + 1) == len(questions):
+            # Save progress every 10 questions
+            if (i + 1) % 10 == 0 or (i + 1) == len(questions):
                 print(f"\nSaving progress... ({i+1}/{len(questions)} questions)")
                 with open(output_file, 'w', encoding='utf-8') as f:
                     json.dump(results, f, indent=2, ensure_ascii=False)
@@ -231,7 +259,7 @@ def main():
     
     try:
         # Process all questions sequentially with periodic saving
-        all_responses = process_questions_sequential(questions, questions_data, OUTPUT_FILE, save_interval=5)
+        all_responses = process_questions_sequential(questions, questions_data, OUTPUT_FILE, save_interval=10)
         
         print(f"Processing complete! Results saved to {OUTPUT_FILE}")
         print(f"Successfully processed {len(all_responses)} questions")
@@ -243,7 +271,8 @@ def main():
         # Fallback to individual processing
         results = []
         for i, item in enumerate(questions_data):
-            question = item.get("question", "")
+            # Try both field names to be safe
+            question = item.get("instruction", "") or item.get("question", "")
             if not question:
                 continue
                 
@@ -261,8 +290,8 @@ def main():
                 }
                 results.append(result_entry)
                 
-                # Save progress every 5 questions
-                if (i + 1) % 5 == 0 or (i + 1) == len(questions_data):
+                # Save progress every 10 questions
+                if (i + 1) % 10 == 0:
                     print(f"Saving progress... ({i+1}/{len(questions_data)})")
                     with open(OUTPUT_FILE, 'w', encoding='utf-8') as f:
                         json.dump(results, f, indent=2, ensure_ascii=False)
