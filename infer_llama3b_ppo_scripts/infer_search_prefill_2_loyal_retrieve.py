@@ -114,6 +114,8 @@ def process_single_question(question_text):
     
     # Initialize variables exactly like infer_search.py
     cnt = 0
+    search_count = 0  # Track number of searches performed
+    max_searches = 10  # Limit searches to save memory
     full_response = ""
     current_prompt = prompt
     search_information = []  # Store all search queries and results
@@ -122,7 +124,7 @@ def process_single_question(question_text):
     current_prompt += "<think> I need to search for more information. </think>"
     
     # Generate freely from here on
-    while True:
+    while search_count < max_searches:
         input_ids = tokenizer.encode(current_prompt, return_tensors='pt').to(device)
         attention_mask = torch.ones_like(input_ids)
         
@@ -158,6 +160,7 @@ def process_single_question(question_text):
                 "query": tmp_query,
                 "results": search_results
             })
+            search_count += 1  # Increment search count
         else:
             search_results = ''
 

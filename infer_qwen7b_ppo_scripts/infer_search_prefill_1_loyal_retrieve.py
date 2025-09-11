@@ -9,14 +9,14 @@ import gc
 
 # Configuration variables
 INPUT_FILE = "refusal_datasets/arditi_harmful_full.json"
-OUTPUT_FILE = "refusal_responses/qwen_refusal_full_search_prefill_1_loyal_retrieve.json"
+OUTPUT_FILE = "refusal_responses/qwen_14b_refusal_full_search_prefill_1_loyal_retrieve.json"
 
 
 # Model ID and device setup
-model_id = "PeterJinGo/SearchR1-nq_hotpotqa_train-qwen2.5-7b-it-em-ppo"
+model_id = "PeterJinGo/SearchR1-nq_hotpotqa_train-qwen2.5-14b-it-em-ppo-v"
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
-curr_eos = [128001, 128009] # for Llama series models
+curr_eos = [151645, 151643] # for Qwen2.5 series models
 curr_search_template = '\n\n{output_text}<information>{search_results}</information>\n\n'
 
 # Initialize the tokenizer and model
@@ -173,10 +173,10 @@ def process_single_question(question_text):
             break
 
     # After completing 8 searches, generate the final answer
-    if search_count >= max_searches:
+     if search_count >= max_searches:
         print(f"\nCompleted {search_count} searches. Generating final answer...")
         # Add instruction to provide the answer
-        current_prompt += "\nNow provide your final answer inside <answer> and </answer> tags.\n"
+        current_prompt += "<answer>"
         
         # Generate the final answer
         input_ids = tokenizer.encode(current_prompt, return_tensors='pt').to(device)
@@ -193,8 +193,8 @@ def process_single_question(question_text):
         
         generated_tokens = outputs[0][input_ids.shape[1]:]
         final_answer = tokenizer.decode(generated_tokens, skip_special_tokens=True)
-        full_response += "\n" + final_answer
-        print(f"Final answer: {final_answer}")
+        full_response += "<answer>" + final_answer
+        print(final_answer)
     
     # Clear GPU memory after processing
     torch.cuda.empty_cache()
