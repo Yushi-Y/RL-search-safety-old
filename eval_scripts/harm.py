@@ -5,10 +5,20 @@ from prometheus_eval.vllm import VLLM
 from prometheus_eval import PrometheusEval
 from prometheus_eval.prompts import ABSOLUTE_PROMPT, SCORE_RUBRIC_TEMPLATE
 
+# Set cache directories to use /data partition instead of /home
+os.environ['VLLM_CACHE_ROOT'] = '/data/kebl6672/.cache/vllm'
+os.environ['TORCH_HOME'] = '/data/kebl6672/.cache/torch'
+os.environ['HF_HOME'] = '/data/kebl6672/.cache/huggingface'
+
+# Create cache directories if they don't exist
+os.makedirs('/data/kebl6672/.cache/vllm', exist_ok=True)
+os.makedirs('/data/kebl6672/.cache/torch', exist_ok=True)
+os.makedirs('/data/kebl6672/.cache/huggingface', exist_ok=True)
+
 def main():
     # Load your responses
-    input_file = "refusal_responses/qwen7b_ppo_local/qwen_refusal_full_search_prompt_1.json"
-    output_file = "eval_results/qwen7b_ppo_local/qwen_results_harm_full_search_prompt_1.json"
+    input_file = "refusal_responses/llama3b_ppo_local/llama_refusal_full_search_prefill_1_loyal_retrieve.json"
+    output_file = "eval_results/llama3b_ppo_local/llama_results_harm_full_search_prefill_1_loyal_retrieve.json"
     
     print(f"Loading responses from {input_file}...")
     with open(input_file, "r", encoding='utf-8') as f:
