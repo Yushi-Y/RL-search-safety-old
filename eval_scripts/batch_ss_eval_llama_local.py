@@ -17,7 +17,7 @@ def main():
     project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     
     # Directory containing the response files
-    input_dir = os.path.join(project_root, "refusal_responses/llama3b_ppo_local/")
+    input_dir = os.path.join(project_root, "all_responses/llama3b_ppo_local/")
     output_dir = os.path.join(project_root, "eval_results/llama3b_ppo_local/")
     
     # Create output directory if it doesn't exist
