@@ -232,7 +232,7 @@ def main():
             if any(mean > 0 for mean in means):
                 plt.plot(positions_to_plot, scaled_means, f'{marker}-', 
                         label=clean_name, 
-                        color=color, linewidth=2, markersize=8)
+                        color=color, linewidth=3, markersize=10)
                 
                 # Add value labels on points - removed all numbers
                 # for j, (pos, mean_val, scaled_val) in enumerate(zip(positions_to_plot, means, scaled_means)):
@@ -251,13 +251,13 @@ def main():
     plt.xticks(list(range(1, 11)), fontsize=18)
     plt.yticks(fontsize=18)
     
-    # Set y-axis limits to show 0-100 scale
-    plt.ylim(-5, 105)
+    # Set y-axis limits to show 0-90 scale
+    plt.ylim(0, 90)
     
-    # Add vertical line to separate search/base/prompt and prefill regions
-    plt.axvline(x=5.5, color='gray', linestyle='--', alpha=0.5)
-    plt.text(3, 95, 'IT-search/Base-search/Prompt (10 times)\n1-5 queries', ha='center', fontsize=17)
-    plt.text(8, 95, 'Prefill (10 times)\n1-10 queries', ha='center', fontsize=17)
+    # Add vertical line to separate search/base/prompt and prefill regions - removed
+    # plt.axvline(x=5.5, color='gray', linestyle='--', alpha=0.5)
+    # plt.text(3, 90, 'IT-search/Base-search/Prompt (10 times)\n1-5 queries', ha='center', fontsize=17)
+    # plt.text(8, 90, 'Prefill (10 times)\n10 queries', ha='center', fontsize=17)
     
     plt.tight_layout()
     

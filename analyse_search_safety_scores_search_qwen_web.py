@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """
-Multi-dataset analysis script to compare average harm scores for search queries between multiple datasets:
-- search (base)
-- prefill_1_once
-- prefill_2_once  
-- prefill_3_once
-- prompt_1
-- prompt_2
+Multi-dataset analysis script to compare average harm scores for search queries between web datasets:
+- search_web (base)
+- prefill_1_once_web
+- prefill_2_once_web  
+- prefill_3_once_web
+- prompt_1_web
+- prompt_2_web
 """
 
 import json
@@ -88,18 +88,18 @@ def count_questions_by_query_count(question_data):
     return query_count_distribution
 
 def main():
-    # File paths for all datasets (ordered for legend)
+    # File paths for all web datasets (ordered for legend)
     datasets = {
-        'search': "/data/kebl6672/ARL/eval_results/qwen7b_ppo_local/search_eval_qwen_refusal_full_search.json",
-        'base': "/data/kebl6672/ARL/eval_results/qwen7b_ppo_local/search_eval_qwen_refusal_full_search_base.json",
-        'prefill_1_once': "/data/kebl6672/ARL/eval_results/qwen7b_ppo_web/search_eval_qwen_refusal_full_search_prefill_1_once_web.json",
-        'prefill_2_once': "/data/kebl6672/ARL/eval_results/qwen7b_ppo_web/search_eval_qwen_refusal_full_search_prefill_2_once_web.json",
-        'prefill_3_once': "/data/kebl6672/ARL/eval_results/qwen7b_ppo_web/search_eval_qwen_refusal_full_search_prefill_3_once_web.json",
-        'prompt_1': "/data/kebl6672/ARL/eval_results/qwen7b_ppo_web/search_eval_qwen_refusal_full_search_prompt_1_web.json",
-        'prompt_2': "/data/kebl6672/ARL/eval_results/qwen7b_ppo_web/search_eval_qwen_refusal_full_search_prompt_2_web.json"
+        'search_web': "/data/kebl6672/ARL/eval_results/qwen7b_ppo_web/search_eval_qwen_refusal_full_search_web.json",
+        'base_web': "/data/kebl6672/ARL/eval_results/qwen7b_ppo_web/search_eval_qwen_refusal_full_search_base_web.json",
+        'prefill_1_once_web': "/data/kebl6672/ARL/eval_results/qwen7b_ppo_web/search_eval_qwen_refusal_full_search_prefill_1_once_web.json",
+        'prefill_2_once_web': "/data/kebl6672/ARL/eval_results/qwen7b_ppo_web/search_eval_qwen_refusal_full_search_prefill_2_once_web.json",
+        'prefill_3_once_web': "/data/kebl6672/ARL/eval_results/qwen7b_ppo_web/search_eval_qwen_refusal_full_search_prefill_3_once_web.json",
+        'prompt_1_web': "/data/kebl6672/ARL/eval_results/qwen7b_ppo_web/search_eval_qwen_refusal_full_search_prompt_1_web.json",
+        'prompt_2_web': "/data/kebl6672/ARL/eval_results/qwen7b_ppo_web/search_eval_qwen_refusal_full_search_prompt_2_web.json"
     }
     
-    print("Loading data...")
+    print("Loading web data...")
     
     # Load data for all datasets
     all_data = {}
@@ -140,7 +140,7 @@ def main():
     
     # Print position statistics for all datasets
     print(f"\n" + "="*80)
-    print("HARM SCORES BY QUERY POSITION (FIRST 5 POSITIONS)")
+    print("HARM SCORES BY QUERY POSITION (FIRST 5 POSITIONS) - WEB DATASETS")
     print("="*80)
     
     for dataset_name in all_position_avgs.keys():
@@ -153,7 +153,7 @@ def main():
     
     # Print query count distribution for all datasets
     print(f"\n" + "="*80)
-    print("QUESTIONS BY NUMBER OF SEARCH QUERIES (1-5 QUERIES)")
+    print("QUESTIONS BY NUMBER OF SEARCH QUERIES (1-5 QUERIES) - WEB DATASETS")
     print("="*80)
     
     for dataset_name in all_query_count_dist.keys():
@@ -183,7 +183,7 @@ def main():
         return ((score - 1) / (5 - 1)) * 100
     
     # Define custom order for legend: IT search, Base search, Prefill A, Prefill B, then others
-    legend_order = ['search', 'base', 'prefill_1_once', 'prefill_2_once', 'prefill_3_once', 'prompt_1', 'prompt_2']
+    legend_order = ['search_web', 'base_web', 'prefill_1_once_web', 'prefill_2_once_web', 'prefill_3_once_web', 'prompt_1_web', 'prompt_2_web']
     
     # Plot each dataset in custom order
     for i, dataset_name in enumerate(legend_order):
@@ -193,47 +193,52 @@ def main():
             scaled_means = [scale_harm_score(mean) for mean in means]
             
             # Assign colors based on dataset type
-            if dataset_name == 'search':
-                color = '#228B22'  # Forest green for IT search
-            elif dataset_name == 'base':
+            if dataset_name == 'search_web':
+                color = '#228B22'  # Forest green for IT search web
+            elif dataset_name == 'base_web':
                 color = '#808080'  # Light gray for base search
-            elif dataset_name in ['prompt_1', 'prompt_2']:
-                color = '#6BAED6'  # Soft blue for both Prompt A and B
-            elif dataset_name in ['prefill_1_once', 'prefill_2_once']:
-                color = '#FDAE6B'  # Soft orange for both Prefill A and B
-            elif dataset_name == 'prefill_3_once':
-                color = '#BC80BD'  # Soft purple for Prefill C
+            elif dataset_name in ['prompt_1_web', 'prompt_2_web']:
+                color = '#6BAED6'  # Soft blue for both Prompt A and B web
+            elif dataset_name in ['prefill_1_once_web', 'prefill_2_once_web']:
+                color = '#FDAE6B'  # Soft orange for both Prefill A and B web
+            elif dataset_name == 'prefill_3_once_web':
+                color = '#BC80BD'  # Soft purple for Prefill C web
             else:
                 color = colors[i % len(colors)]
             
             marker = markers[i % len(markers)]
             
             # Clean up dataset names for legend
-            if dataset_name == 'search':
+            if dataset_name == 'search_web':
                 clean_name = 'IT-search'
-            elif dataset_name == 'base':
+            elif dataset_name == 'base_web':
                 clean_name = 'Base-search'
-            elif dataset_name == 'prefill_1_once':
+            elif dataset_name == 'prefill_1_once_web':
                 clean_name = 'Prefill A'
-            elif dataset_name == 'prefill_2_once':
+            elif dataset_name == 'prefill_2_once_web':
                 clean_name = 'Prefill B'
-            elif dataset_name == 'prefill_3_once':
+            elif dataset_name == 'prefill_3_once_web':
                 clean_name = 'Prefill C'
-            elif dataset_name == 'prompt_1':
+            elif dataset_name == 'prompt_1_web':
                 clean_name = 'Prompt A'
-            elif dataset_name == 'prompt_2':
+            elif dataset_name == 'prompt_2_web':
                 clean_name = 'Prompt B'
             else:
                 clean_name = dataset_name.replace('_', ' ').title()
             
             # Only plot if we have data for at least one position
             if any(mean > 0 for mean in means):
+                # Use thicker lines for IT-search and base-search, thinner for others
+                if dataset_name in ['search_web', 'base_web']:
+                    line_width = 3
+                else:
+                    line_width = 2
                 plt.plot(all_positions, scaled_means, f'{marker}-', 
                         label=clean_name, 
-                        color=color, linewidth=2, markersize=8)
+                        color=color, linewidth=line_width, markersize=10)
                 
                 # Add value labels on points - removed all numbers
-                # if dataset_name in ['search', 'base']:
+                # if dataset_name in ['search_web', 'base_web']:
                 #     for j, (pos, mean_val, scaled_val) in enumerate(zip(all_positions, means, scaled_means)):
                 #         if mean_val > 0:
                 #             plt.annotate(f'{scaled_val:.0f}', (pos, scaled_val), 
@@ -241,29 +246,29 @@ def main():
                 #                        xytext=(0, 5 + (i * 2)),  # Offset labels to avoid overlap
                 #                        ha='center', fontsize=14, color=color, fontweight='bold')
     
-    # plt.xlabel('Search query position', fontsize=18)  # X-axis label removed
+    plt.xlabel('Search query position', fontsize=18)
     plt.ylabel('Average search safety', fontsize=18)
     # Remove title
-    plt.legend(loc='upper right', fontsize=16, framealpha=0.9, ncol=2)
+    # plt.legend(loc='upper right', fontsize=16, framealpha=0.9, ncol=2)  # Legend removed
     # plt.grid(True, alpha=0.3, axis='y')  # Grid removed
     plt.xlim(0.5, 5.5)
     plt.xticks(all_positions, fontsize=16)
     plt.yticks(fontsize=16)
     
-    # Set y-axis limits to show 0-100 scale
-    plt.ylim(-5, 105)
+    # Set y-axis limits to show 0-80 scale
+    plt.ylim(0, 80)
     
     plt.tight_layout()
     
     # Save the plot
-    output_path = "/data/kebl6672/ARL/figures/search_safety_scores_first_5_positions.png"
+    output_path = "/data/kebl6672/ARL/figures/search_safety_scores_web_first_5_positions.png"
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
     plt.savefig(output_path, dpi=300, bbox_inches='tight')
-    print(f"\nSearch safety scores line plot saved to: {output_path}")
+    print(f"\nSearch safety scores line plot (web) saved to: {output_path}")
     
     # Create a comparison table for the first 5 positions
     print(f"\n" + "="*80)
-    print("COMPARISON TABLE - FIRST 5 POSITIONS")
+    print("COMPARISON TABLE - FIRST 5 POSITIONS (WEB DATASETS)")
     print("="*80)
     
     # Print header
@@ -287,7 +292,7 @@ def main():
     
     # Create query count distribution comparison table
     print(f"\n" + "="*80)
-    print("QUERY COUNT DISTRIBUTION COMPARISON TABLE (1-5 QUERIES)")
+    print("QUERY COUNT DISTRIBUTION COMPARISON TABLE (1-5 QUERIES) - WEB DATASETS")
     print("="*80)
     
     # Print header
@@ -319,7 +324,7 @@ def main():
             'position_counts': all_position_counts[dataset_name]
         }
     
-    results_path = "/data/kebl6672/ARL/figures/search_safety_scores_results.json"
+    results_path = "/data/kebl6672/ARL/figures/search_safety_scores_web_results.json"
     with open(results_path, 'w') as f:
         json.dump(results, f, indent=2)
     print(f"Detailed results saved to: {results_path}")
