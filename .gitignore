@@ -131,6 +131,9 @@ analyse_search/*
 # evaluation results (generated outputs)
 eval_results/qwen7b_v2_ppo_local/*
 
+# some eval scripts
+eval_scripts/plot_checkpoint_search_safety_by_position.py
+
 # generated figures and plots
 # figures/
 

@@ -26,10 +26,10 @@ def evaluate_file(input_file, prometheus, rubric_data):
     
     # Create output file path
     base_name = os.path.splitext(os.path.basename(input_file))[0]
-    output_file = f"eval_results/llama3b_ppo_web/{base_name}_refusal_results.json"
+    output_dir = "/data/kebl6672/ARL/eval_results/qwen14b_all"
+    output_file = os.path.join(output_dir, f"{base_name}_refusal_results.json")
     
     # Create output directory if it doesn't exist
-    output_dir = os.path.dirname(output_file)
     os.makedirs(output_dir, exist_ok=True)
     
     print("Starting refusal evaluation...")
@@ -116,7 +116,8 @@ def evaluate_file(input_file, prometheus, rubric_data):
 
 def main():
     # Get all JSON files in refusal_responses directory
-    input_files = glob.glob("refusal_responses/*.json")
+    input_dir = "/data/kebl6672/ARL/all_responses/qwen14b_all"
+    input_files = glob.glob(os.path.join(input_dir, "*.json"))
     
     if not input_files:
         print("No JSON files found in refusal_responses directory")
@@ -179,6 +180,13 @@ def main():
             print(f"{filename}: {result['average_refusal_score']:.2f} (n={result['num_responses']})")
         else:
             print(f"{filename}: ERROR - {result.get('error', 'Unknown error')}")
+    
+    # Save summary to file
+    summary_file = "/data/kebl6672/ARL/eval_results/qwen14b_all/summary_refusal_scores.json"
+    os.makedirs(os.path.dirname(summary_file), exist_ok=True)
+    with open(summary_file, 'w', encoding='utf-8') as f:
+        json.dump(file_results, f, indent=2, ensure_ascii=False)
+    print(f"\nSummary saved to {summary_file}")
 
 if __name__ == "__main__":
     main() 

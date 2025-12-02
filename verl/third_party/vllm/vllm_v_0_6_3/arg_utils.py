@@ -17,8 +17,13 @@ import os
 from dataclasses import dataclass
 
 from transformers import PretrainedConfig
-from vllm.config import EngineConfig
 from vllm.engine.arg_utils import EngineArgs
+
+# EngineConfig: In vLLM 0.6.3 it's EngineConfig in vllm.config, in 0.10.0+ it's renamed to VllmConfig
+try:
+    from vllm.config import VllmConfig as EngineConfig
+except ImportError:
+    from vllm.config import EngineConfig
 
 from .config import LoadConfig, ModelConfig
 

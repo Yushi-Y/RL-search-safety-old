@@ -6,14 +6,39 @@ import requests
 import json
 import time
 import gc
+import os
 
 # Configuration variables
-INPUT_FILE = "refusal_datasets/arditi_harmful_full.json"
-OUTPUT_FILE = "refusal_responses/qwen14b_refusal_full_search_prefill_4.json"
+INPUT_FILE = "/data/kebl6672/ARL/refusal_datasets/harmful_full_original.json"
+OUTPUT_FILE = "/data/kebl6672/ARL/all_responses/qwen14b_grpo_web/qwen14b_refusal_full_search_web.json"
 
+# SerpAPI Configuration
+SERPAPI_KEY = os.getenv("SERPAPI_KEY")  # Set your SerpAPI key as environment variable
+if not SERPAPI_KEY:
+    raise ValueError("SERPAPI_KEY environment variable is required. Please set it before running the script.")
+SERPAPI_URL = "https://serpapi.com/search"
+
+# Rate limiting
+class RateLimitTracker:
+    def __init__(self):
+        self.query_count = 0
+        self.start_time = time.time()
+    
+    def can_make_query(self):
+        # Basic rate limiting - adjust based on your SerpAPI plan
+        return True  # SerpAPI handles rate limiting on their end
+    
+    def record_query(self):
+        self.query_count += 1
+        if self.query_count % 10 == 0:
+            elapsed = time.time() - self.start_time
+            print(f"Made {self.query_count} queries in {elapsed:.1f} seconds")
+
+# Global rate tracker
+rate_tracker = RateLimitTracker()
 
 # Model ID and device setup
-model_id = "PeterJinGo/SearchR1-nq_hotpotqa_train-qwen2.5-14b-it-em-ppo-v0.2"
+model_id = "PeterJinGo/SearchR1-nq_hotpotqa_train-qwen2.5-14b-it-em-grpo-groupsize1-v0.2"
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 curr_eos = [151645, 151643] # for Qwen2.5 series models
@@ -61,24 +86,66 @@ def get_query(text):
         return None
 
 def search(query: str):
-    payload = {
-            "queries": [query],
-            "topk": 3,
-            "return_scores": True
+    """Perform web search using SerpAPI with Google search"""
+    try:
+        # Check rate limits
+        if not rate_tracker.can_make_query():
+            return "Rate limit exceeded, please wait"
+        
+        # SerpAPI parameters for Google search
+        params = {
+            "engine": "google",
+            "q": query,
+            "api_key": SERPAPI_KEY,
+            "num": 3,  # Number of results to return
+            "safe": "active"  # Safe search
         }
-    results = requests.post("http://127.0.0.1:8000/retrieve", json=payload).json()['result']
-                
-    def _passages2string(retrieval_result):
+        
+        # Make request to SerpAPI
+        response = requests.get(SERPAPI_URL, params=params)
+        response.raise_for_status()
+        
+        # Record the query
+        rate_tracker.record_query()
+        
+        data = response.json()
+        
+        # Extract search results
+        results = []
+        
+        # Get answer box if available (direct answers)
+        answer_box = data.get('answer_box', {})
+        if answer_box:
+            title = answer_box.get('title', 'Direct Answer')
+            snippet = answer_box.get('snippet', answer_box.get('answer', 'No snippet available'))
+            results.append({
+                'title': title,
+                'content': snippet
+            })
+        
+        # Get organic search results
+        organic_results = data.get('organic_results', [])
+        for result in organic_results[:3]:  # Top 3 results
+            title = result.get('title', 'No title')
+            snippet = result.get('snippet', 'No snippet available')
+            results.append({
+                'title': title,
+                'content': snippet
+            })
+        
+        # Format results similar to local search
         format_reference = ''
-        for idx, doc_item in enumerate(retrieval_result):
-                        
-            content = doc_item['document']['contents']
-            title = content.split("\n")[0]
-            text = "\n".join(content.split("\n")[1:])
-            format_reference += f"Doc {idx+1}(Title: {title}) {text}\n"
+        for idx, result in enumerate(results):
+            format_reference += f"Doc {idx+1}(Title: {result['title']}) {result['content']}\n"
+        
         return format_reference
-
-    return _passages2string(results[0])
+        
+    except requests.exceptions.RequestException as e:
+        print(f"SerpAPI request error: {e}")
+        return f"Search error: Unable to fetch results for '{query}'"
+    except Exception as e:
+        print(f"Search error: {e}")
+        return f"Search error: {str(e)}"
 
 # Initialize the stopping criteria
 target_sequences = ["</search>", " </search>", "</search>\n", " </search>\n", "</search>\n\n", " </search>\n\n"]
@@ -116,10 +183,7 @@ def process_single_question(question_text):
     current_prompt = prompt
     search_information = []  # Store all search queries and results
     
-    # Prefill with "<think> I need to" only once at the beginning
-    current_prompt += "<think> I need to"
-    
-    # Generate freely from here on
+    # Process the question with potential search iterations - same logic as infer_search.py
     while True:
         input_ids = tokenizer.encode(current_prompt, return_tensors='pt').to(device)
         attention_mask = torch.ones_like(input_ids)
@@ -138,18 +202,17 @@ def process_single_question(question_text):
         if outputs[0][-1].item() in curr_eos:
             generated_tokens = outputs[0][input_ids.shape[1]:]
             output_text = tokenizer.decode(generated_tokens, skip_special_tokens=True)
-            # Add the prefilled think tag to the response since it's not in generated_tokens
-            full_response += "<think> I need to" + output_text
-            print("<think> I need to" + output_text)
+            full_response += output_text
+            print(output_text)
             break
 
         generated_tokens = outputs[0][input_ids.shape[1]:]
         output_text = tokenizer.decode(generated_tokens, skip_special_tokens=True)
-        # Add the prefilled think tag to the response since it's not in generated_tokens
-        full_response += "<think> I need to" + output_text
+        full_response += output_text
         
         tmp_query = get_query(tokenizer.decode(outputs[0], skip_special_tokens=True))
         if tmp_query:
+            # print(f'searching "{tmp_query}"...')
             search_results = search(tmp_query)
             # Store the search query and results
             search_information.append({
@@ -159,9 +222,10 @@ def process_single_question(question_text):
         else:
             search_results = ''
 
-        search_text = curr_search_template.format(output_text="<think> I need to" + output_text, search_results=search_results)
+        search_text = curr_search_template.format(output_text=output_text, search_results=search_results)
         current_prompt += search_text
-        print(f"Search: {search_text}")
+        cnt += 1
+        print(search_text)
     
     # Clear GPU memory after processing
     torch.cuda.empty_cache()
@@ -196,14 +260,14 @@ def process_questions_sequential(questions, questions_data, output_file, save_in
             print(f"Search queries: {len(search_info)}")
             print("-" * 50)
             
-            # Save progress every 10 questions
-            if (i + 1) % 10 == 0 or (i + 1) == len(questions):
+            # Save progress every save_interval questions
+            if (i + 1) % save_interval == 0 or (i + 1) == len(questions):
                 print(f"\nSaving progress... ({i+1}/{len(questions)} questions)")
                 with open(output_file, 'w', encoding='utf-8') as f:
                     json.dump(results, f, indent=2, ensure_ascii=False)
             
-            # Small delay to prevent overwhelming the search service
-            time.sleep(1)
+            # Small delay to prevent overwhelming the search service and respect rate limits
+            time.sleep(2)  # Increased delay for SerpAPI rate limits
             
         except Exception as e:
             print(f"Error processing question {i+1}: {e}")
@@ -230,8 +294,6 @@ def main():
     
     print(f"Processing {len(questions)} valid questions sequentially...")
     
-
-    
     try:
         # Process all questions sequentially with periodic saving
         all_responses = process_questions_sequential(questions, questions_data, OUTPUT_FILE, save_interval=10)
@@ -246,8 +308,7 @@ def main():
         # Fallback to individual processing
         results = []
         for i, item in enumerate(questions_data):
-            # Try both field names to be safe
-            question = item.get("instruction", "") or item.get("question", "")
+            question = item.get("question", "")
             if not question:
                 continue
                 

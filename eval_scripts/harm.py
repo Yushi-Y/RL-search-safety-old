@@ -26,10 +26,10 @@ def evaluate_file(input_file, prometheus, rubric_data):
     
     # Create output file path
     base_name = os.path.splitext(os.path.basename(input_file))[0]
-    output_file = f"eval_results/llama3b_ppo_web/{base_name}_harm_results.json"
+    output_dir = "/data/kebl6672/ARL/eval_results/qwen14b_all"
+    output_file = os.path.join(output_dir, f"{base_name}_harm_results.json")
     
     # Create output directory if it doesn't exist
-    output_dir = os.path.dirname(output_file)
     os.makedirs(output_dir, exist_ok=True)
     
     print("Starting harmful content evaluation...")
@@ -61,7 +61,7 @@ def evaluate_file(input_file, prometheus, rubric_data):
                 rubric=rubric_data
             )
             
-            print(f"Harm Score: {score}")
+            print(f"Search Safety Score: {score}")
             print(f"Feedback: {feedback[:200]}...")
             
             # Create result entry
@@ -108,7 +108,7 @@ def evaluate_file(input_file, prometheus, rubric_data):
     valid_scores = [r["harm_score"] for r in results if isinstance(r["harm_score"], (int, float))]
     if valid_scores:
         avg_score = sum(valid_scores) / len(valid_scores)
-        print(f"Average harm score: {avg_score:.2f}")
+        print(f"Average search safety score: {avg_score:.2f}")
         return avg_score, len(valid_scores)
     else:
         print("No valid scores found")
@@ -116,7 +116,8 @@ def evaluate_file(input_file, prometheus, rubric_data):
 
 def main():
     # Get all JSON files in refusal_responses directory
-    input_files = glob.glob("refusal_responses/*.json")
+    input_dir = "/data/kebl6672/ARL/all_responses/qwen14b_all"
+    input_files = glob.glob(os.path.join(input_dir, "*.json"))
     
     if not input_files:
         print("No JSON files found in refusal_responses directory")
@@ -178,7 +179,7 @@ def main():
     
     # Print final summary
     print(f"\n{'='*100}")
-    print("FINAL SUMMARY - AVERAGE HARM SCORES BY FILE")
+    print("FINAL SUMMARY - AVERAGE SEARCH SAFETY SCORES BY FILE")
     print(f"{'='*100}")
     
     for result in file_results:
@@ -187,6 +188,13 @@ def main():
             print(f"{filename}: {result['average_harm_score']:.2f} (n={result['num_responses']})")
         else:
             print(f"{filename}: ERROR - {result.get('error', 'Unknown error')}")
+    
+    # Save summary to file
+    summary_file = "/data/kebl6672/ARL/eval_results/qwen14b_all/summary_harm_scores.json"
+    os.makedirs(os.path.dirname(summary_file), exist_ok=True)
+    with open(summary_file, 'w', encoding='utf-8') as f:
+        json.dump(file_results, f, indent=2, ensure_ascii=False)
+    print(f"\nSummary saved to {summary_file}")
 
 if __name__ == "__main__":
     main() 

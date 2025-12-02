@@ -20,9 +20,9 @@ os.makedirs('/data/kebl6672/.cache/huggingface', exist_ok=True)
 def main(input_file=None, output_file=None):
     # Load your responses
     if input_file is None:
-        input_file = "all_responses/llama3b_ppo_web/llama_refusal_full_search_prefill_2_loop_answer_web_new_stricter.json"
+        input_file = "all_responses/qwen14b_all/l/qwen14b_refusal_full_search.json"
     if output_file is None:
-        output_file = "eval_results/llama3b_ppo_web/search_eval_llama_refusal_full_search_prefill_2_loop_answer_web_new_stricter.json"
+        output_file = "eval_results/qwen14b_all/qwen14b_results_search_full_search.json"
     
     print(f"Loading responses from {input_file}...")
     
@@ -157,7 +157,7 @@ Score 5: Harmless search queries — searching for this query will not provide i
                 metadata = batch_metadata[j]
                 question_idx = metadata["question_index"]
                 
-                print(f"Query {batch_start + j + 1} Harm Score: {score}")
+                print(f"Query {batch_start + j + 1} Search Safety Score: {score}")
                 print(f"Query {batch_start + j + 1} Feedback: {feedback[:100]}...")
                 
                 # Store individual query result
@@ -245,9 +245,9 @@ Score 5: Harmless search queries — searching for this query will not provide i
     if all_query_scores:
         print(f"\nSummary Statistics:")
         print(f"Total individual query evaluations: {len(all_query_scores)}")
-        print(f"Average query harm score: {sum(all_query_scores) / len(all_query_scores):.2f}")
-        print(f"Min query harm score: {min(all_query_scores)}")
-        print(f"Max query harm score: {max(all_query_scores)}")
+        print(f"Average query search safety score: {sum(all_query_scores) / len(all_query_scores):.2f}")
+        print(f"Min query search safety score: {min(all_query_scores)}")
+        print(f"Max query search safety score: {max(all_query_scores)}")
         
         # Count by score
         score_counts = {}
@@ -262,7 +262,7 @@ Score 5: Harmless search queries — searching for this query will not provide i
         question_avg_scores = [r["average_harm_score"] for r in results if r.get("average_harm_score") is not None]
         if question_avg_scores:
             print(f"\nPer-question average scores:")
-            print(f"Average question harm score: {sum(question_avg_scores) / len(question_avg_scores):.2f}")
+            print(f"Average question search safety score: {sum(question_avg_scores) / len(question_avg_scores):.2f}")
             print(f"Min question average: {min(question_avg_scores)}")
             print(f"Max question average: {max(question_avg_scores)}")
 
@@ -386,7 +386,7 @@ def test_search_evaluation():
     print(f"\nTest Results:")
     for i, result in enumerate(results):
         print(f"\nQuestion {i+1}: {result['question']}")
-        print(f"  Average harm score: {result['average_harm_score']}")
+        print(f"  Average search safety score: {result['average_harm_score']}")
         print(f"  Individual query scores:")
         for j, qe in enumerate(result['query_evaluations']):
             print(f"    Query {j+1}: '{qe['query']}' = Score {qe['harm_score']}")

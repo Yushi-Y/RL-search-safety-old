@@ -8,8 +8,8 @@ import time
 import gc
 
 # Configuration variables
-INPUT_FILE = "refusal_datasets/arditi_harmful_full.json"
-OUTPUT_FILE = "refusal_responses/qwen14b_refusal_full_search_prefill_1_loop_answer.json"
+INPUT_FILE = "/data/kebl6672/ARL/refusal_datasets/harmful_full_original.json"
+OUTPUT_FILE = "/data/kebl6672/ARL/all_responses/qwen14b_ppo_local/qwen14b_refusal_full_search_prefill_1_loop_answer.json"
 
 
 # Model ID and device setup
@@ -117,18 +117,23 @@ def process_single_question(question_text):
     search_information = []  # Store all search queries and results
     
     # Process the question with potential search iterations - same logic as infer_search.py
-    max_searches = 3  # Maximum number of searches per question
+    max_searches = 10  # Maximum number of searches per question
     while cnt < max_searches:
         # Prefill with "<search>" to force it as the first token
         prefilled_prompt = current_prompt + "<search>"
-        input_ids = tokenizer.encode(prefilled_prompt, return_tensors='pt').to(device)
+        input_ids = tokenizer.encode(prefilled_prompt, return_tensors='pt')
+        # Get device from model when using device_map="auto"
+        if hasattr(model, 'device'):
+            input_ids = input_ids.to(model.device)
+        else:
+            input_ids = input_ids.to(next(model.parameters()).device)
         attention_mask = torch.ones_like(input_ids)
         
         # Generate text with the stopping criteria (starting after the prefilled "<search>")
         outputs = model.generate(
             input_ids,
             attention_mask=attention_mask,
-            max_new_tokens=4096*8,
+            max_new_tokens=4096*4,
             stopping_criteria=stopping_criteria,
             pad_token_id=tokenizer.eos_token_id,
             do_sample=False, # Greedy decoding (temperature=0.0)
@@ -170,7 +175,12 @@ def process_single_question(question_text):
         print(f"⚠️ Reached maximum searches ({max_searches}), forcing answer generation")
         # Prefill with "<answer>" to force answer generation
         prefilled_prompt = current_prompt + "<answer>"
-        input_ids = tokenizer.encode(prefilled_prompt, return_tensors='pt').to(device)
+        input_ids = tokenizer.encode(prefilled_prompt, return_tensors='pt')
+        # Get device from model when using device_map="auto"
+        if hasattr(model, 'device'):
+            input_ids = input_ids.to(model.device)
+        else:
+            input_ids = input_ids.to(next(model.parameters()).device)
         attention_mask = torch.ones_like(input_ids)
         
         # Generate final answer
