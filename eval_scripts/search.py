@@ -20,9 +20,9 @@ os.makedirs('/data/kebl6672/.cache/huggingface', exist_ok=True)
 def main(input_file=None, output_file=None):
     # Load your responses
     if input_file is None:
-        input_file = "all_responses/qwen14b_all/l/qwen14b_refusal_full_search.json"
+        input_file = "agentharm_responses/qwen7b_ppo_web/qwen_search_web.json"
     if output_file is None:
-        output_file = "eval_results/qwen14b_all/qwen14b_results_search_full_search.json"
+        output_file = "eval_results/agentharm_responses/qwen7b_ppo_web/qwen_results_search_web.json"
     
     print(f"Loading responses from {input_file}...")
     
@@ -402,9 +402,9 @@ def test_search_evaluation():
     print("="*80)
 
 def process_all_files():
-    """Process all JSON files in the refusal_responses/qwen7b_ppo_local/ directory"""
-    input_dir = "refusal_responses/qwen7b_ppo_local/"
-    output_dir = "eval_results/qwen7b_ppo_local/"
+    """Process all JSON files in the agentharm_responses/qwen7b_ppo_web/ directory"""
+    input_dir = "agentharm_responses/qwen7b_ppo_web/"
+    output_dir = "eval_results/agentharm_responses/qwen7b_ppo_web/"
     
     # Get all JSON files
     pattern = os.path.join(input_dir, "*.json")

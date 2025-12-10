@@ -129,7 +129,7 @@ log/
 analyse_search/*
 
 # evaluation results (generated outputs)
-eval_results/qwen7b_v2_ppo_local/*
+eval_results/*
 
 # some eval scripts
 eval_scripts/plot_checkpoint_search_safety_by_position.py
@@ -141,6 +141,7 @@ eval_scripts/plot_checkpoint_search_safety_by_position.py
 all_responses/*
 qwen_responses_v2/*
 refusal_responses/*
+agentharm_responses/*
 
 # additional attacks
 attacks/infer_qwen14b_local_ppo_scripts/*
@@ -148,3 +149,5 @@ attacks/infer_research_q7b_loc_po/*
 attacks/infer_v2_local/*
 
 
+# model checkpoints
+verl_checkpoints/*

@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 """
-Batch script to run search.py over all files in all_responses/qwen14b_all/
+Batch script to run search.py over all files in agentharm_responses/qwen7b_ppo_web/
 Usage: 
-    python batch_search_eval_qwen_web.py                    # Process all files
-    python batch_search_eval_qwen_web.py file1.json file2.json  # Process specific files
+    python3 batch_search_eval_qwen_web.py                    # Process all files
+    python3 batch_search_eval_qwen_web.py file1.json file2.json  # Process specific files
+    
+Note: Run in default/base Python environment (not retriever conda env) to avoid CUDA compatibility issues.
 """
 
 import os
@@ -17,8 +19,8 @@ def main():
     project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     
     # Directory containing the response files
-    input_dir = os.path.join(project_root, "all_responses/checkpoints_qwen3b_grpo_web/")
-    output_dir = os.path.join(project_root, "eval_results/checkpoints_qwen3b_grpo_web/")
+    input_dir = os.path.join(project_root, "agentharm_responses/qwen7b_ppo_web/")
+    output_dir = os.path.join(project_root, "eval_results/agentharm_responses/qwen7b_ppo_web/")
     
     # Create output directory if it doesn't exist
     os.makedirs(output_dir, exist_ok=True)
@@ -48,7 +50,7 @@ def main():
     for i, file in enumerate(files, 1):
         print(f"  {i}. {os.path.basename(file)}")
     
-    print(f"\nStarting batch processing for qwen3b_grpo_web...")
+    print(f"\nStarting batch processing for qwen7b_ppo_web...")
     
     # Process each file
     for i, input_file in enumerate(files, 1):
@@ -78,12 +80,13 @@ def main():
             content = f.read()
         
         # Replace the input and output files with absolute paths
+        # Match the current default paths in search.py
         content = content.replace(
-            'input_file = "all_responses/qwen14b_all/l/qwen14b_refusal_full_search.json"',
+            'input_file = "agentharm_responses/qwen7b_ppo_web/qwen_search_web.json"',
             f'input_file = "{os.path.abspath(input_file)}"'
         )
         content = content.replace(
-            'output_file = "eval_results/qwen14b_all/qwen14b_results_search_full_search.json"',
+            'output_file = "eval_results/agentharm_responses/qwen7b_ppo_web/qwen_results_search_web.json"',
             f'output_file = "{os.path.abspath(output_file)}"'
         )
         
@@ -93,12 +96,13 @@ def main():
         
         try:
             # Run the temporary script from the eval_scripts directory
+            # Use python3 and ensure we're not in retriever conda env
             temp_filename = os.path.basename(temp_script)
             result = subprocess.run(
-                ["python", temp_filename],
+                ["python3", temp_filename],
                 capture_output=True,
                 text=True,
-                timeout=3600,  # 1 hour timeout per file
+                timeout=1800,  # 30 minutes timeout per file
                 cwd=os.path.join(project_root, "eval_scripts")  # Run from eval_scripts directory
             )
             
@@ -127,7 +131,7 @@ def main():
                 os.remove(temp_script)
     
     print(f"\n{'='*80}")
-    print("Batch processing complete for qwen3b_grpo_web!")
+    print("Batch processing complete for qwen7b_ppo_web!")
     print(f"Processed {len(files)} files")
     print(f"Results saved in: {output_dir}")
     print(f"{'='*80}")

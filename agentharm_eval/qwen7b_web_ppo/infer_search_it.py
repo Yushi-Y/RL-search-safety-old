@@ -1,7 +1,7 @@
 import transformers
 import torch
 import random
-from datasets import load_dataset
+from datasets import load_dataset, DatasetDict
 import requests
 import json
 import time
@@ -9,8 +9,8 @@ import gc
 import os
 
 # Configuration variables
-INPUT_FILE = "refusal_datasets/arditi_harmful_full.json"
-OUTPUT_FILE = "refusal_responses/qwen7b_ppo_web/qwen_refusal_full_search_base_web.json"
+DATASET_NAME = "ai-safety-institute/AgentHarm"
+OUTPUT_FILE = "agentharm_responses/qwen7b_ppo_web/qwen_it.json"
 
 # SerpAPI Configuration
 SERPAPI_KEY = os.getenv("SERPAPI_KEY")  # Set your SerpAPI key as environment variable
@@ -37,9 +37,8 @@ class RateLimitTracker:
 # Global rate tracker
 rate_tracker = RateLimitTracker()
 
-
 # Model ID and device setup
-model_id = "PeterJinGo/SearchR1-nq_hotpotqa_train-qwen2.5-7b-em-ppo"
+model_id = "Qwen/Qwen2.5-7B-Instruct"
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 curr_eos = [151645, 151643] # for Qwen2.5 series models
@@ -261,8 +260,8 @@ def process_questions_sequential(questions, questions_data, output_file, save_in
             print(f"Search queries: {len(search_info)}")
             print("-" * 50)
             
-            # Save progress every 10 questions
-            if (i + 1) % 10 == 0 or (i + 1) == len(questions):
+            # Save progress every save_interval questions
+            if (i + 1) % save_interval == 0 or (i + 1) == len(questions):
                 print(f"\nSaving progress... ({i+1}/{len(questions)} questions)")
                 with open(output_file, 'w', encoding='utf-8') as f:
                     json.dump(results, f, indent=2, ensure_ascii=False)
@@ -283,19 +282,36 @@ def process_questions_sequential(questions, questions_data, output_file, save_in
     return [r["response"] for r in results]
 
 def main():
-    # Load the questions from the JSON file
-    print(f"Loading questions from {INPUT_FILE}...")
-    with open(INPUT_FILE, 'r', encoding='utf-8') as f:
-        questions_data = json.load(f)
+    # Load the questions from HuggingFace dataset - harmful subset (208 rows)
+    print(f"Loading questions from {DATASET_NAME} (harmful subset)...")
     
+    # Try loading with name parameter (for configurations), then fallback
+    try:
+        dataset = load_dataset(DATASET_NAME, name="harmful")
+    except:
+        # Load all data and access harmful subset
+        dataset = load_dataset(DATASET_NAME)
+    
+    # Handle different possible dataset structures for harmful subset
+    if isinstance(dataset, DatasetDict):
+        # If it's a DatasetDict, try to get harmful subset
+        if "harmful" in dataset:
+            harmful_data = dataset["harmful"]
+        else:
+            # Combine all splits or use first available
+            harmful_data = dataset[list(dataset.keys())[0]]
+    else:
+        # If it's already a Dataset, use it directly
+        harmful_data = dataset
+    
+    # Convert to list of dicts
+    questions_data = [item for item in harmful_data]
     print(f"Found {len(questions_data)} questions to process")
     
-    # Extract questions
-    questions = [item.get("instruction", "") for item in questions_data if item.get("instruction", "")]
+    # Extract questions from 'prompt' field
+    questions = [item.get("prompt", "") for item in questions_data if item.get("prompt", "")]
     
     print(f"Processing {len(questions)} valid questions sequentially...")
-    
-
     
     try:
         # Process all questions sequentially with periodic saving
@@ -311,7 +327,8 @@ def main():
         # Fallback to individual processing
         results = []
         for i, item in enumerate(questions_data):
-            question = item.get("question", "")
+            # Extract from 'prompt' field (correct field name for AgentHarm)
+            question = item.get("prompt", "")
             if not question:
                 continue
                 
