@@ -1,5 +1,5 @@
 
-file_path=/data/kebl6672/ARL/search_data
+file_path=/VData/kebl6672/ARL/search_data
 index_file=$file_path/e5_Flat.index
 corpus_file=$file_path/wiki-18.jsonl
 retriever_name=e5
