@@ -23,7 +23,7 @@ import random
 
 # Configuration
 BASE_MODEL = "Qwen/Qwen2.5-7B-Instruct"
-SEARCHR1_MODEL = "PeterJinGo/SearchR1-nq_hotpotqa_train-qwen2.5-7b-em-grpo-v0.2"
+SEARCHR1_MODEL = "PeterJinGo/SearchR1-nq_hotpotqa_train-qwen2.5-7b-it-em-grpo-v0.2"
 OUTPUT_DIR = Path("/VData/kebl6672/ARL/direction_analysis_7b")
 OUTPUT_DIR.mkdir(exist_ok=True)
 

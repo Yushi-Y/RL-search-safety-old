@@ -1,142 +1,123 @@
-# RL-search-safety
+# Agentic RL for Search is Unsafe
 
-Code for paper "Agentic RL for search is unsafe"
+Code for the paper *"Agentic Reinforcement Learning for Search is Unsafe"* (Yang et al., 2025). [[Paper]](https://arxiv.org/abs/2510.17431)
 
-This repository contains code for training RL-based search agents and evaluating their safety vulnerabilities.
+We train search-enabled LLMs (Llama and Qwen series) with RL (PPO/GRPO) following [Search-R1](https://github.com/PeterGriffinJin/Search-R1) (Jin et al., 2025), and evaluate their safety vulnerabilities under search-based jailbreak attacks.
 
-## Overview
-
-This project implements reinforcement learning (RL) training for search-enabled LLMs (Qwen and Llama-series) using PPO and GRPO algorithms. The training pipeline follows *Search-R1: Training LLMs to Reason and Leverage Search Engines with Reinforcement Learning* (Jin et al., 2025) [Pape](https://arxiv.org/abs/2503.09516). 
-
-It includes evaluation frameworks for assessing search quality, harmfulness, and refusal behaviours, as well as jailbreak attack scripts (Search and Multi-search attacks) for safety testing.
-
-## Structure
+## Repository Structure
 
 ```
-RL-search-safety/
+ARL/
+├── verl/                     # VERL RL training framework (modified from Search-R1)
 ├── setup/                    # Core components
 │   ├── llm_agent/           # LLM agent implementation
-│   └── retrieve/            # Retrieval/search server code
-├── verl/                     # VERL RL training framework
-├── attacks/                  # Jailbreak attack scripts
-├── eval_scripts/             # Evaluation code
-├── scripts/                  # Data processing and utilities
-├── refusal_datasets/         # Harmful query datasets
-└── train_*.sh               # RL training scripts
+│   └── retrieve/            # Retrieval server code
+├── attacks/                  # Jailbreak attack inference scripts
+│   ├── infer_llama3b_*/     # Llama-3.2-3B attack variants
+│   ├── infer_qwen7b_*/      # Qwen2.5-7B attack variants
+│   └── infer_qwen14b_*/     # Qwen2.5-14B attack variants
+├── eval_scripts/             # Evaluation (harm, refusal, search safety)
+├── figures/                  # Plotting scripts
+├── analyse_search/           # Search behaviour analysis scripts
+├── refusal_datasets/         # Harmful query datasets for attack evaluation
+├── scripts/                  # Data processing utilities
+├── train_ppo.sh              # PPO training script
+└── train_grpo.sh             # GRPO training script
 ```
 
-## Installation
+## Setup
+
+### 1. Install Dependencies
+
+We use two conda environments following [Search-R1](https://github.com/PeterGriffinJin/Search-R1):
+
+**RL training environment:**
+```bash
+conda create -n rl python=3.9
+conda activate rl
+pip install torch==2.4.0 --index-url https://download.pytorch.org/whl/cu121
+pip install vllm==0.6.3
+pip install -e .
+pip install flash-attn --no-build-isolation
+pip install wandb
+```
+
+**Retriever environment:**
+```bash
+conda create -n retriever python=3.10
+conda activate retriever
+pip install transformers datasets pyserini uvicorn fastapi
+conda install -c pytorch -c nvidia faiss-gpu=1.8.0
+```
+
+### 2. Download Search Data
+
+Download the pre-built FAISS index and Wikipedia corpus (see [Search-R1 data setup](https://github.com/PeterGriffinJin/Search-R1#data)):
 
 ```bash
-pip install -r requirements.txt
+save_path=search_data
+python scripts/download.py --save_path $save_path
+cat $save_path/part_* > $save_path/e5_Flat.index
+gzip -d $save_path/wiki-18.jsonl.gz
 ```
 
-Key dependencies: `torch`, `transformers`, `vllm`, `accelerate`, `ray`, `wandb`, `prometheus_eval`
+### 3. Start Retrieval Server
+
+```bash
+conda activate retriever
+bash retrieval_launch.sh
+```
+
+This starts the retrieval server at `http://127.0.0.1:8000/retrieve`.
+
+### 4. Training Data
+
+Download training data from [HuggingFace](https://huggingface.co/datasets/PeterJinGo/nq_hotpotqa_train) and place in `data/nq_search/`.
 
 ## RL Training
 
-### PPO Training
-
-Train a search agent using Proximal Policy Optimization:
-
+### PPO
 ```bash
+conda activate rl
 bash train_ppo.sh
 ```
 
-Configure in `train_ppo.sh`:
-- `BASE_MODEL`: Base model (e.g., `meta-llama/Llama-3.2-3B`, `Qwen/Qwen2.5-7B`)
-- `EXPERIMENT_NAME`: Experiment identifier
-- `DATA_DIR`: Training data directory
-- `CUDA_VISIBLE_DEVICES`: GPU devices
-
-### GRPO Training
-
-Train using Group Relative Policy Optimization:
-
+### GRPO
 ```bash
 bash train_grpo.sh
 ```
 
-
-### Training Data
-
-Training data should be in parquet format at `data/nq_search/train.parquet`. The data format includes search queries, retrieved results, and agent responses.
+Configure `BASE_MODEL`, `EXPERIMENT_NAME`, and `CUDA_VISIBLE_DEVICES` in the training scripts. Supported models include `meta-llama/Llama-3.2-3B-Instruct`, `Qwen/Qwen2.5-7B-Instruct`, `Qwen/Qwen2.5-14B-Instruct`.
 
 ## Jailbreak Attacks
 
-The `attacks/` directory contains scripts for testing model safety with harmful queries:
+The `attacks/` directory contains inference scripts for testing model safety with harmful queries from `refusal_datasets/`:
 
-- **Inference scripts**: Generate responses to harmful queries using trained models
-- **Attack variants**: Different prompting strategies (prefill, loop, prompt-based)
-- **Model-specific**: Scripts for different model sizes (3B, 7B, 14B)
+- **Prefill attacks**: Force `<search>` token prefix to bypass refusal
+- **Prompt-based attacks**: Inject adversarial instructions in the prompt
+- **Loop/answer variants**: Multi-turn attack strategies
 
+Example:
+```bash
+conda activate retriever  # needs retrieval server running
+python attacks/infer_qwen7b_local_ppo_scripts/infer_search_prefill_1.py
+```
+
+Responses are saved to `all_responses/`.
 
 ## Evaluation
 
-### Search Quality Evaluation
-
-Evaluate search quality using Prometheus evaluator:
+Evaluation uses [Prometheus-eval](https://github.com/prometheus-eval/prometheus-eval) (LLM-based, 1-5 scale):
 
 ```bash
-python eval_scripts/search.py --input_file <responses.json> --output_file <results.json>
+python eval_scripts/harm.py <responses.json>       # Harmfulness
+python eval_scripts/refusal.py <responses.json>     # Refusal behaviour
+python eval_scripts/search.py --input_file <responses.json> --output_file <results.json>  # Search safety
 ```
 
-### Harmfulness Evaluation
-
-Assess if responses contain harmful content:
-
-```bash
-python eval_scripts/harm.py <input_file>
-```
-
-### Refusal Evaluation
-
-Check if models refuse harmful queries:
-
-```bash
-python eval_scripts/refusal.py <input_file>
-```
-
-### Semantic Similarity
-
-Evaluate semantic similarity between queries and responses:
-
-```bash
-python eval_scripts/semantic_similarity_llama.py <input_file>
-python eval_scripts/semantic_similarity_qwen.py <input_file>
-```
-
-### Batch Evaluation
-
-Run batch evaluation on multiple files:
-
-```bash
-python eval_scripts/batch_search_eval_qwen_local.py
-python eval_scripts/batch_ss_eval_llama_local.py
-```
-
-## Data
-
-- **Training data**: `data/nq_search/` - Natural Questions dataset for RL training
-- **Harmful datasets**: `refusal_datasets/` - Datasets of harmful queries for safety testing
-  - `harmful_full_questions.json`
-  - `harmful_full_imperative.json`
-  - `harmful_full_original.json`
-
-## Outputs
-
-- **Model responses**: `all_responses/`, `refusal_responses/` - Generated responses from attacks
-- **Evaluation results**: `eval_results/` - Evaluation outputs 
-- **Figures**: `figures/` - Analysis plots and visualizations 
-
-## Analysis
-
-The `analyse_search/` directory contains scripts for analyzing attack results, safety scores, and search behavior patterns.
-
+Results are saved to `eval_results/`.
 
 ## Citation
-
-If you find this code helpful, please cite the paper:
 
 ```bibtex
 @misc{yang2025agenticreinforcementlearningsearch,
@@ -148,3 +129,4 @@ If you find this code helpful, please cite the paper:
   primaryClass  = {cs.CL},
   url           = {https://arxiv.org/abs/2510.17431}
 }
+```

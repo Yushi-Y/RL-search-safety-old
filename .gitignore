@@ -1,157 +1,126 @@
-# Ignore search data
-search_data/*
-
-
-**/*.pt
-**/checkpoints
-**/wget-log
-**/_build/
-**/*.ckpt
-**/outputs
-**/*.tar.gz
-**/playground
-**/wandb
-
-# Byte-compiled / optimized / DLL files
+# ==============================
+# Python
+# ==============================
 __pycache__/
 *.py[cod]
 *$py.class
-dataset/*
-tensorflow/my_graph/*
-.idea/
-# C extensions
 *.so
-data
-sft/output/*
-sft/data/*
-
-# Distribution / packaging
+*.egg-info/
+*.egg
+.installed.cfg
 .Python
 build/
 develop-eggs/
 dist/
-downloads/
 eggs/
 .eggs/
-lib/
-lib64/
-parts/
 sdist/
 var/
-*.egg-info/
-.installed.cfg
-*.egg
+lib/
+lib64/
 
-# PyInstaller
-#  Usually these files are written by a python script from a template
-#  before PyInstaller builds the exe, so as to inject date/other infos into it.
-*.manifest
-*.spec
+# ==============================
+# Large data & search index
+# ==============================
+search_data/
+data/
+verl_checkpoints/
+**/*.pt
+**/*.ckpt
+*.safetensors
+**/*.tar.gz
 
-# Installer logs
-pip-log.txt
-pip-delete-this-directory.txt
+# ==============================
+# Model responses (generated)
+# ==============================
+all_responses/
+qwen_responses_v2/
+refusal_responses/
+agentharm_responses/
 
-# Unit test / coverage reports
+# ==============================
+# Evaluation results (generated)
+# ==============================
+eval_results/
+
+# ==============================
+# Experiment analysis outputs
+# ==============================
+direction_analysis_*/
+steering_results_*/
+weight_analysis/
+agentharm_eval/
+analyse_search/
+
+# ==============================
+# Generated figures & plots
+# ==============================
+figures/*.png
+figures/*.pdf
+figures/*.json
+
+# ==============================
+# Logs & experiment tracking
+# ==============================
+*.log
+log/
+**/logs
+**/wandb
+**/outputs
+**/wget-log
+
+# ==============================
+# Attack script variants (generated)
+# ==============================
+attacks/infer_qwen14b_local_ppo_scripts/
+attacks/infer_research_q7b_loc_po/
+attacks/infer_v2_local/
+
+# ==============================
+# Specific eval scripts (generated)
+# ==============================
+eval_scripts/plot_checkpoint_search_safety_by_position.py
+
+# ==============================
+# Datasets (large, download separately)
+# ==============================
+harmless_datasets/
+
+# ==============================
+# Build & packaging
+# ==============================
+downloads/
+parts/
+**/playground
+**/_build/
+**/checkpoints
+
+# ==============================
+# IDE & OS
+# ==============================
+.idea/
+.vscode/
+.DS_Store
+*.swp
+.ipynb_checkpoints
+
+# ==============================
+# Virtual environments
+# ==============================
+venv/
+ENV/
+
+# ==============================
+# Test & coverage
+# ==============================
 htmlcov/
 .tox/
 .coverage
 .coverage.*
 .cache
-nosetests.xml
-coverage.xml
-*,cover
 .hypothesis/
 
-# Translations
-*.mo
-*.pot
-
-# Django stuff:
-*.log
-local_settings.py
-
-image_outputs
-
-checkpoints
-
-# Flask stuff:
-instance/
-.webassets-cache
-
-# Scrapy stuff:
-.scrapy
-
-# Sphinx documentation
-docs/_build/
-
-# PyBuilder
-target/
-
-# IPython Notebook
-.ipynb_checkpoints
-
-# pyenv
-.python-version
-
-# celery beat schedule file
-celerybeat-schedule
-
-
-# virtualenv
-venv/
-ENV/
-
-# Spyder project settings
-.spyderproject
-
-# Rope project settings
-.ropeproject
-
-# vscode
-.vscode
-
-# Mac
-.DS_Store
-
-# output logs
-tests/e2e/toy_examples/deepspeed/synchronous/output.txt
-
-# vim
-*.swp
-
-# log*
-log/
-
-**logs
-
-# search analysis
-analyse_search/*
-
-# evaluation results (generated outputs)
-eval_results/*
-
-# some eval scripts
-eval_scripts/plot_checkpoint_search_safety_by_position.py
-
-# generated figures and plots
-# figures/
-
-# all model responses
-all_responses/*
-qwen_responses_v2/*
-refusal_responses/*
-agentharm_responses/*
-
-# additional attacks
-attacks/infer_qwen14b_local_ppo_scripts/*
-attacks/infer_research_q7b_loc_po/*
-attacks/infer_v2_local/*
-
-
-# model checkpoints
-verl_checkpoints/*
-*.safetensors
-
-# PDF documents
+# ==============================
+# Misc
+# ==============================
 *.pdf
