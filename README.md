@@ -17,6 +17,7 @@ ARL/
 │   ├── infer_qwen7b_*/      # Qwen2.5-7B attack variants
 │   └── infer_qwen14b_*/     # Qwen2.5-14B attack variants
 ├── eval_scripts/             # Evaluation (harm, refusal, search safety)
+├── interp/                   # Interpretability analysis (directions, weights, steering)
 ├── figures/                  # Plotting scripts
 ├── analyse_search/           # Search behaviour analysis scripts
 ├── refusal_datasets/         # Harmful query datasets for attack evaluation
