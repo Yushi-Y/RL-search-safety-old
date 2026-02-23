@@ -1,5 +1,9 @@
 # Agentic RL for Search is Unsafe
 
+Note: This repo is deprecated. Please check the latest code at [THIS REPO] (https://github.com/Yushi-Y/RL-search-safety).
+
+-------------------------------------------------------------------------------------------------------------------------
+
 Code for the paper *"Agentic Reinforcement Learning for Search is Unsafe"* (Yang et al., 2025). [[Paper]](https://arxiv.org/abs/2510.17431)
 
 We train search-enabled LLMs (Llama and Qwen series) with RL (PPO/GRPO) following [Search-R1](https://github.com/PeterGriffinJin/Search-R1) (Jin et al., 2025), and evaluate their safety vulnerabilities under search-based jailbreak attacks.
