@@ -1,6 +1,6 @@
 # Agentic RL for Search is Unsafe
 
-Note: This repo is deprecated. Please check the latest code at [THIS REPO] (https://github.com/Yushi-Y/RL-search-safety).
+Note: This repo is deprecated. Please check the latest code at [THIS REPO](https://github.com/Yushi-Y/RL-search-safety).
 
 -------------------------------------------------------------------------------------------------------------------------
 
