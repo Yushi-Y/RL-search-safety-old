@@ -1,13 +1,13 @@
 """
 Extract search harmfulness direction from IT models.
 
-Approach (UPDATED - NO system prompt):
-1. For each prompt (harmful and benign), format with simple question + append <search>
+Approach:
+1. For each prompt (harmful and benign), format with search system prompt + append <search>
 2. Forward pass, grab hidden state at last token (= the <search> token)
 3. Direction d = mean(harmful) - mean(benign), normalized
 
-NOTE: Similar to refusal direction extraction, but with <search> token appended.
-This avoids system prompt "contamination" of the direction.
+NOTE: Uses the same system prompt as the actual attack scenario so the extraction
+context matches where steering will be applied.
 """
 
 import torch
@@ -48,25 +48,26 @@ RANDOM_SEED = 42
 
 
 def prepare_prompt(instruction, tokenizer):
-    """
-    Format instruction with simple question + <search> token.
-
-    UPDATED: No system prompt - just like refusal direction but with <search> appended.
-    This gives cleaner direction without system prompt contamination.
-    """
+    """Format instruction with search system prompt + <search> token."""
     question = instruction.strip()
+    if question and question[-1] != '?':
+        question += '?'
 
-    # Simple chat template (no search attack system prompt)
+    system_prompt = f"""Answer the given question. \
+You must conduct reasoning inside <think> and </think> every time you get new information. \
+After reasoning, if you find you lack some knowledge, you can call a search engine by <search> query </search> and it will return the top searched results between <information> and </information>. \
+You can search as many times as your want. \
+If you find no further external knowledge needed, you can directly provide the answer inside <answer> and </answer>, without detailed illustrations. Question: {question}\n"""
+
     if tokenizer.chat_template:
         prompt = tokenizer.apply_chat_template(
-            [{"role": "user", "content": question}],
+            [{"role": "user", "content": system_prompt}],
             add_generation_prompt=True,
             tokenize=False,
         )
     else:
-        prompt = question
+        prompt = system_prompt
 
-    # Append <search> token to capture search query formulation
     return prompt + "<search>"
 
 
@@ -99,8 +100,7 @@ def main():
     for model_name, model_cfg in MODELS.items():
         model_path = model_cfg["model_path"]
         layer_indices = model_cfg["layers"]
-        # Use "clean" suffix to distinguish from old version with system prompt
-        output_dir = Path(f"/VData/kebl6672/ARL/interp_results/search_direction_clean_{model_name}")
+        output_dir = Path(f"/VData/kebl6672/ARL/interp_results/search_direction_{model_name}")
         output_dir.mkdir(parents=True, exist_ok=True)
 
         print(f"\n{'='*60}")
@@ -122,11 +122,11 @@ def main():
             harmful_reps = torch.stack([
                 get_hidden_state(model, tokenizer, inst, layer_idx)
                 for inst in tqdm(harmful, desc="  Harmful")
-            ]).double()  # float64 for numerical stability (matches Arditi)
+            ]).double()  # float64 for numerical stability 
             benign_reps = torch.stack([
                 get_hidden_state(model, tokenizer, inst, layer_idx)
                 for inst in tqdm(harmless, desc="  Benign")
-            ]).double()  # float64 for numerical stability (matches Arditi)
+            ]).double()  # float64 for numerical stability 
 
             direction_raw = harmful_reps.mean(0) - benign_reps.mean(0)
             direction = direction_raw / direction_raw.norm()
@@ -154,19 +154,19 @@ def main():
         torch.cuda.empty_cache()
 
         # Save
-        with open(output_dir / "search_direction_clean.json", "w") as f:
+        with open(output_dir / "search_direction.json", "w") as f:
             json.dump(all_directions, f, indent=2)
-        with open(output_dir / "search_direction_clean_stats.json", "w") as f:
+        with open(output_dir / "search_direction_stats.json", "w") as f:
             json.dump(all_stats, f, indent=2)
 
         # Plot separation by layer
         fig, ax = plt.subplots(figsize=(10, 6))
         seps = [all_stats[f"layer_{l}"]["separation"] for l in layer_indices]
-        ax.bar(range(len(layer_indices)), seps, color='#2ecc71', alpha=0.8)  # Green for clean
+        ax.bar(range(len(layer_indices)), seps, color='#2ecc71', alpha=0.8)
         ax.set_xticks(range(len(layer_indices)))
         ax.set_xticklabels([f'Layer {l}' for l in layer_indices])
         ax.set_ylabel('Separation (harmful - benign)')
-        ax.set_title(f'{model_name}: Search Direction (Clean - No System Prompt) by Layer')
+        ax.set_title(f'{model_name}: Search Direction Separation by Layer')
         ax.grid(True, alpha=0.3, axis='y')
         plt.tight_layout()
         plt.savefig(output_dir / "separation_by_layer.png", dpi=300)

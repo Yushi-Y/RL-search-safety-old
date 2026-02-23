@@ -36,7 +36,7 @@ MODELS = {
 
 # Selection
 SELECTED_MODEL = "qwen7b"  # Which model to run (must be a key in MODELS)
-DIRECTION_TYPE = "refusal"  # Options: "refusal" or "search_clean"
+DIRECTION_TYPE = "search"  # Options: "refusal", "search", or "search_clean"
 
 STEERING_COEFFS = [-2.0, -1.0, 0.0, 1.0, 2.0]
 RANDOM_SEED = 42
@@ -199,6 +199,9 @@ def main():
     if DIRECTION_TYPE == "refusal":
         direction_file = Path(f"/VData/kebl6672/ARL/interp_results/refusal_direction_{model_name}/refusal_direction.json")
         stats_file = Path(f"/VData/kebl6672/ARL/interp_results/refusal_direction_{model_name}/refusal_stats.json")
+    elif DIRECTION_TYPE == "search":
+        direction_file = Path(f"/VData/kebl6672/ARL/interp_results/search_direction_{model_name}/search_direction.json")
+        stats_file = Path(f"/VData/kebl6672/ARL/interp_results/search_direction_{model_name}/search_direction_stats.json")
     elif DIRECTION_TYPE == "search_clean":
         direction_file = Path(f"/VData/kebl6672/ARL/interp_results/search_safety_direction_{model_name}/search_clean_direction.json")
         stats_file = Path(f"/VData/kebl6672/ARL/interp_results/search_safety_direction_{model_name}/search_clean_stats.json")
