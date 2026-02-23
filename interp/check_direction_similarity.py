@@ -1,6 +1,11 @@
 """
-Quick check: How similar are refusal direction vs search harmfulness direction?
+Quick check: How similar are refusal direction vs search direction?
 Compare across all models.
+
+Compares:
+- Refusal direction (simple prompts, no <search>)
+- Search clean direction (simple prompts + <search>, NO system prompt)
+- [Optional] Search harmfulness direction (with system prompt - old version)
 """
 import json
 import numpy as np
@@ -21,17 +26,34 @@ MODELS = {
     },
 }
 
+# Choose which search direction to compare
+SEARCH_DIR_TYPE = "clean"  # Options: "clean" (new, no system prompt) or "harmfulness" (old, with system prompt)
+
 results_dir = Path("/VData/kebl6672/ARL/interp_results")
 
-print("Direction Similarity Analysis: Refusal vs Search Harmfulness")
+print(f"Direction Similarity Analysis: Refusal vs Search {SEARCH_DIR_TYPE.title()}")
 print("=" * 80)
 
 for model_name, model_cfg in MODELS.items():
     refusal_file = results_dir / f"refusal_direction_{model_name}" / "refusal_direction.json"
-    search_file = results_dir / f"search_harmfulness_direction_{model_name}" / "search_harmfulness_direction.json"
 
-    if not refusal_file.exists() or not search_file.exists():
-        print(f"\n{model_name.upper()}: Missing files, skipping...")
+    # Choose search direction file based on type
+    if SEARCH_DIR_TYPE == "clean":
+        # New version: search_direction_clean or search_safety_direction (with search_clean_direction.json)
+        search_file = results_dir / f"search_direction_clean_{model_name}" / "search_direction_clean.json"
+        # Fallback to alternate naming
+        if not search_file.exists():
+            search_file = results_dir / f"search_safety_direction_{model_name}" / "search_clean_direction.json"
+    else:
+        # Old version: search_harmfulness_direction
+        search_file = results_dir / f"search_harmfulness_direction_{model_name}" / "search_harmfulness_direction.json"
+
+    if not refusal_file.exists():
+        print(f"\n{model_name.upper()}: Refusal file missing, skipping...")
+        continue
+
+    if not search_file.exists():
+        print(f"\n{model_name.upper()}: Search {SEARCH_DIR_TYPE} file missing, skipping...")
         continue
 
     with open(refusal_file) as f:
@@ -39,7 +61,7 @@ for model_name, model_cfg in MODELS.items():
     with open(search_file) as f:
         search_dirs = json.load(f)
 
-    print(f"\n{model_name.upper()}:")
+    print(f"\n{model_name.upper()}: (Refusal vs Search {SEARCH_DIR_TYPE.title()})")
     print("-" * 80)
 
     for layer_idx in model_cfg["layers"]:

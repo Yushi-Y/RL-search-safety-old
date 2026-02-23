@@ -1,10 +1,13 @@
 """
 Extract search harmfulness direction from IT models.
 
-Approach:
-1. For each prompt (harmful and benign), format with system prompt + append <search>
+Approach (UPDATED - NO system prompt):
+1. For each prompt (harmful and benign), format with simple question + append <search>
 2. Forward pass, grab hidden state at last token (= the <search> token)
 3. Direction d = mean(harmful) - mean(benign), normalized
+
+NOTE: Similar to refusal direction extraction, but with <search> token appended.
+This avoids system prompt "contamination" of the direction.
 """
 
 import torch
@@ -20,19 +23,19 @@ import random
 MODELS = {
     "llama3b": {
         "model_path": "meta-llama/Llama-3.2-3B-Instruct",
-        "layers": [14, 18, 22, 26, 28],  # 28 layers (0-27), index 28 = output of last layer
+        "layers": [14, 18, 20, 22, 26, 28],  # 28 layers (0-27); 18,20,22 = steering targets
     },
     "qwen7b": {
         "model_path": "Qwen/Qwen2.5-7B-Instruct",
-        "layers": [14, 18, 22, 26, 28],  # 28 layers (0-27)
+        "layers": [14, 18, 20, 22, 26, 28],  # 28 layers (0-27); 22 = steering target
     },
     "qwen14b": {
         "model_path": "Qwen/Qwen2.5-14B-Instruct",
-        "layers": [24, 32, 40, 44, 48],  # 48 layers (0-47)
+        "layers": [24, 32, 36, 40, 44, 48],  # 48 layers (0-47); 36 = steering target
     },
     "qwen32b": {
         "model_path": "Qwen/Qwen2.5-32B-Instruct",
-        "layers": [32, 42, 52, 60, 64],  # 64 layers (0-63)
+        "layers": [32, 42, 50, 52, 60, 64],  # 64 layers (0-63); 50 = steering target
     },
 }
 
@@ -45,26 +48,25 @@ RANDOM_SEED = 42
 
 
 def prepare_prompt(instruction, tokenizer):
-    """Format instruction with system prompt + chat template + <search> suffix."""
+    """
+    Format instruction with simple question + <search> token.
+
+    UPDATED: No system prompt - just like refusal direction but with <search> appended.
+    This gives cleaner direction without system prompt contamination.
+    """
     question = instruction.strip()
-    if question and question[-1] != '?':
-        question += '?'
 
-    system_prompt = f"""Answer the given question. \
-You must conduct reasoning inside <think> and </think> every time you get new information. \
-After reasoning, if you find you lack some knowledge, you can call a search engine by <search> query </search> and it will return the top searched results between <information> and </information>. \
-You can search as many times as your want. \
-If you find no further external knowledge needed, you can directly provide the answer inside <answer> and </answer>, without detailed illustrations. Question: {question}\n"""
-
+    # Simple chat template (no search attack system prompt)
     if tokenizer.chat_template:
         prompt = tokenizer.apply_chat_template(
-            [{"role": "user", "content": system_prompt}],
+            [{"role": "user", "content": question}],
             add_generation_prompt=True,
             tokenize=False,
         )
     else:
-        prompt = system_prompt
+        prompt = question
 
+    # Append <search> token to capture search query formulation
     return prompt + "<search>"
 
 
@@ -97,7 +99,8 @@ def main():
     for model_name, model_cfg in MODELS.items():
         model_path = model_cfg["model_path"]
         layer_indices = model_cfg["layers"]
-        output_dir = Path(f"/VData/kebl6672/ARL/interp_results/search_harmfulness_direction_{model_name}")
+        # Use "clean" suffix to distinguish from old version with system prompt
+        output_dir = Path(f"/VData/kebl6672/ARL/interp_results/search_direction_clean_{model_name}")
         output_dir.mkdir(parents=True, exist_ok=True)
 
         print(f"\n{'='*60}")
@@ -119,11 +122,11 @@ def main():
             harmful_reps = torch.stack([
                 get_hidden_state(model, tokenizer, inst, layer_idx)
                 for inst in tqdm(harmful, desc="  Harmful")
-            ])
+            ]).double()  # float64 for numerical stability (matches Arditi)
             benign_reps = torch.stack([
                 get_hidden_state(model, tokenizer, inst, layer_idx)
                 for inst in tqdm(harmless, desc="  Benign")
-            ])
+            ]).double()  # float64 for numerical stability (matches Arditi)
 
             direction_raw = harmful_reps.mean(0) - benign_reps.mean(0)
             direction = direction_raw / direction_raw.norm()
@@ -151,19 +154,19 @@ def main():
         torch.cuda.empty_cache()
 
         # Save
-        with open(output_dir / "search_harmfulness_direction.json", "w") as f:
+        with open(output_dir / "search_direction_clean.json", "w") as f:
             json.dump(all_directions, f, indent=2)
-        with open(output_dir / "search_harmfulness_stats.json", "w") as f:
+        with open(output_dir / "search_direction_clean_stats.json", "w") as f:
             json.dump(all_stats, f, indent=2)
 
         # Plot separation by layer
         fig, ax = plt.subplots(figsize=(10, 6))
         seps = [all_stats[f"layer_{l}"]["separation"] for l in layer_indices]
-        ax.bar(range(len(layer_indices)), seps, color='#e74c3c', alpha=0.8)
+        ax.bar(range(len(layer_indices)), seps, color='#2ecc71', alpha=0.8)  # Green for clean
         ax.set_xticks(range(len(layer_indices)))
         ax.set_xticklabels([f'Layer {l}' for l in layer_indices])
         ax.set_ylabel('Separation (harmful - benign)')
-        ax.set_title(f'{model_name}: Search Harmfulness Direction Separation by Layer')
+        ax.set_title(f'{model_name}: Search Direction (Clean - No System Prompt) by Layer')
         ax.grid(True, alpha=0.3, axis='y')
         plt.tight_layout()
         plt.savefig(output_dir / "separation_by_layer.png", dpi=300)

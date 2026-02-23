@@ -20,19 +20,19 @@ import random
 MODELS = {
     "llama3b": {
         "model_path": "meta-llama/Llama-3.2-3B-Instruct",
-        "layers": [14, 18, 22, 26, 28],  # 28 layers (0-27), index 28 = output of last layer
+        "layers": [14, 18, 20, 22, 26, 28],  # 28 layers (0-27); 18,20,22 = steering targets
     },
     "qwen7b": {
         "model_path": "Qwen/Qwen2.5-7B-Instruct",
-        "layers": [14, 18, 22, 26, 28],  # 28 layers (0-27)
+        "layers": [14, 18, 20, 22, 26, 28],  # 28 layers (0-27); 22 = steering target
     },
     "qwen14b": {
         "model_path": "Qwen/Qwen2.5-14B-Instruct",
-        "layers": [24, 32, 40, 44, 48],  # 48 layers (0-47)
+        "layers": [24, 32, 36, 40, 44, 48],  # 48 layers (0-47); 36 = steering target
     },
     "qwen32b": {
         "model_path": "Qwen/Qwen2.5-32B-Instruct",
-        "layers": [32, 42, 52, 60, 64],  # 64 layers (0-63)
+        "layers": [32, 42, 50, 52, 60, 64],  # 64 layers (0-63); 50 = steering target
     },
 }
 
@@ -119,11 +119,11 @@ def main():
             harmful_reps = torch.stack([
                 get_hidden_state(model, tokenizer, inst, layer_idx)
                 for inst in tqdm(harmful, desc="  Harmful")
-            ])
+            ]).double()  # float64 for numerical stability (matches Arditi)
             benign_reps = torch.stack([
                 get_hidden_state(model, tokenizer, inst, layer_idx)
                 for inst in tqdm(harmless, desc="  Benign")
-            ])
+            ]).double()  # float64 for numerical stability (matches Arditi)
 
             direction_raw = harmful_reps.mean(0) - benign_reps.mean(0)
             direction = direction_raw / direction_raw.norm()
